@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase/firebase_service.dart';
+import 'screens/completed_courses_screen.dart';
+import 'screens/course_catalog_screen.dart';
+import 'screens/course_detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'theme/app_theme.dart';
@@ -31,6 +34,11 @@ class EduPlanApp extends StatelessWidget {
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),
+        '/completed-courses': (context) => const CompletedCoursesScreen(),
+        '/catalog': (context) => const CourseCatalogScreen(),
+        '/course-detail': (context) => CourseDetailScreen(
+              courseCode: (ModalRoute.of(context)?.settings.arguments as String?) ?? 'PRM393',
+            ),
       },
     );
   }

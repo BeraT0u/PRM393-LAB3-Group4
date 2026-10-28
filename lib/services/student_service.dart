@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/completed_course_model.dart';
 import '../models/course_model.dart';
 import '../models/student_profile_model.dart';
 import '../utils/app_logger.dart';
@@ -70,6 +71,20 @@ class StudentService {
     } catch (e, st) {
       AppLogger.error('Lỗi khi cập nhật thông tin cá nhân', e, st);
       rethrow;
+    }
+  }
+
+  /// Lấy danh sách môn đã học của sinh viên (SCR-03)
+  Future<List<CompletedCourseModel>> getCompletedCourses(String uid) async {
+    try {
+      final snapshot =
+          await _studentsRef.doc(uid).collection('completed_courses').get();
+      return snapshot.docs
+          .map((d) => CompletedCourseModel.fromMap(d.data(), d.id))
+          .toList();
+    } catch (e) {
+      AppLogger.warning('Lỗi khi tải môn đã học của $uid: $e');
+      return [];
     }
   }
 

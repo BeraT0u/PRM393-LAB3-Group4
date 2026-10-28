@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/course_model.dart';
 import '../utils/app_logger.dart';
+import '../utils/course_filter.dart';
 import 'database_seeder.dart';
 
 class CourseService {
@@ -58,18 +59,6 @@ class CourseService {
     String category = 'Tất cả',
   }) async {
     final allCourses = await getCourses();
-    final cleanQuery = query.trim().toLowerCase();
-
-    return allCourses.where((c) {
-      final matchesQuery = cleanQuery.isEmpty ||
-          c.code.toLowerCase().contains(cleanQuery) ||
-          c.name.toLowerCase().contains(cleanQuery);
-
-      final matchesCategory = category == 'Tất cả' ||
-          (category == 'Chuyên ngành SE' && c.category.contains('SE')) ||
-          (category == 'Cơ sở' && (c.category.contains('Cơ sở') || c.category.contains('Toán')));
-
-      return matchesQuery && matchesCategory;
-    }).toList();
+    return CourseFilter.apply(allCourses, query: query, category: category);
   }
 }
