@@ -30,6 +30,19 @@
 
 **EduPlan** là ứng dụng di động hỗ trợ sinh viên lập kế hoạch học tập theo kỳ học, theo dõi tiến độ tích lũy tín chỉ tốt nghiệp, dự báo độ khó và khối lượng tự học của từng môn. Ứng dụng tích hợp hệ thống phát hiện quá tải thông minh (Workload Analyzer) nhằm cảnh báo sinh viên khi tổng giờ tự học vượt quá ngưỡng an toàn hoặc vi phạm điều kiện môn tiên quyết, đồng thời hỗ trợ xuất bản kế hoạch học tập ra định dạng tài liệu PDF A4.
 
+### 🌟 Các Tính Năng Nâng Cao Nổi Bật:
+1. **Hệ thống 3 Persona Định Danh & Onboarding Tài Khoản Mới**:
+   - Hỗ trợ 3 tài khoản mẫu với kịch bản riêng: Trần Hoàng Long (Xung đột quá tải 34h $\to$ 26h), Nguyễn Mai Linh (Kỳ tốt nghiệp 125/145 TC, GPA 3.82), Lê Minh Tuấn (Năm 2, nguy cơ học vụ 38h).
+   - Tài khoản Google mới chưa định danh sẽ khởi tạo Hồ sơ Rỗng, app chủ động hiển thị thông báo yêu cầu thiết lập hồ sơ và bổ sung môn đã học.
+2. **Tự Quản Lý & Chỉnh Sửa Hồ Sơ Cá Nhân (Profile Settings)**:
+   - Cho phép sinh viên tự setup Họ tên, Mã sinh viên, Ảnh đại diện (hoặc đồng bộ Google), và GPA mục tiêu trực tiếp từ màn hình Cá nhân (`SCR-08`).
+3. **Nghiệm Thu Kỳ Học ("Đã Hoàn Thành Kỳ Học")**:
+   - Tại màn hình Tổng kết (`SCR-07`), nút "Đã hoàn thành kỳ học" tự động lưu toàn bộ môn trong kỳ vào danh mục `completed_courses`, cộng dồn số tín chỉ tích lũy và cập nhật tiến độ tốt nghiệp.
+4. **Tự Khai Báo Môn Đã Học Theo Kỳ Với 2 Tầng Ràng Buộc (SCR-03)**:
+   - Sinh viên bắt đầu dùng app có thể tự add các môn đã hoàn thành ở các kỳ trước.
+   - **Ràng buộc tiến trình kỳ học**: Kỳ 2 phải có Kỳ 1 (chỉ được thêm Kỳ $N$ khi Kỳ $1 \dots N-1$ đã có dữ liệu).
+   - **Ràng buộc môn tiên quyết**: Môn thêm vào Kỳ $N$ bắt buộc phải có các môn tiên quyết nằm trong danh sách các môn đã hoàn thành ở các kỳ trước đó ($< N$).
+
 ---
 
 ## 🏛️ 2. Kiến trúc & Công nghệ (Architecture & Tech Stack)

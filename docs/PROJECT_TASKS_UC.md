@@ -51,7 +51,7 @@
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
 | **UC-08** | SCR-01 Màn hình Đăng nhập & State SCR-01_Loading | Simple (N=2) | | 28/10/2026 | `Đã commit` | Logo sổ tay 64dp, slogan, nút đăng nhập Google, spinner "Đang xác thực Google..." |
-| **UC-09** | Xử lý xác thực Google Sign-In & Auth-state Routing (Signed in -> Home) | Medium (N=3) | | | `Chưa bắt đầu` | Bắt sự kiện hủy đăng nhập từ người dùng, dọn dẹp session khi sign-out |
+| **UC-09** | Xử lý Google Sign-In & Đa Persona (3 TK mẫu Long/Linh/Tuấn; TK mới báo rỗng) | Medium (N=3) | | | `Chưa bắt đầu` | Long (90TC, 34h conflict), Linh (125TC, kỳ tốt nghiệp), Tuấn (35TC, 38h); TK mới báo hồ sơ trống |
 | **UC-10** | SCR-02 Home Dashboard: Lời chào, tích lũy 90/145 TC, GPA mục tiêu 3.60 | Simple (N=2) | | | `Chưa bắt đầu` | Top App Bar, Avatar sinh viên, pull-to-refresh cập nhật dữ liệu từ Firestore |
 | **UC-11** | SCR-02 Hero Card "🔥 Trọng tâm Tuần 8": Tiến độ tự học môn PRM393 (6/8h) | Simple (N=2) | | | `Chưa bắt đầu` | Thanh progress bar xanh, tag Mục tiêu Điểm A, chạm vào mở chi tiết môn SCR-05 |
 | **UC-12** | SCR-02 Section "💡 Tips học tập kỳ này" kết hợp Remote Config toggle | Simple (N=2) | | | `Chưa bắt đầu` | 2 thẻ gợi ý ngắn SWE302 (C4 Model) và DBI202; ẩn/hiện theo enable_study_tips |
@@ -61,7 +61,8 @@
 ### 🔷 NHÓM 3: TIẾN ĐỘ TÍCH LŨY & DANH MỤC MÔN HỌC (SCR-03, 04, 05)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-13** | SCR-03 Màn hình Môn Đã Học (Completed Courses) & Mở khóa tiên quyết | Medium (N=3) | | | `Chưa bắt đầu` | Card Tiến độ 90/145 TC (62%), Filter Chips theo kỳ, dòng chú thích mở khóa PRM393 |
+| **UC-13** | SCR-03 Màn hình Môn Đã Học (Completed Courses) & Thẻ tiến độ 90/145 TC | Medium (N=3) | | | `Chưa bắt đầu` | Card Tiến độ 90/145 TC (62%), Filter Chips theo kỳ, dòng chú thích mở khóa PRM393 |
+| **UC-13B**| SCR-03 Modal Thêm môn đã học theo kỳ: Thẩm định kỳ 2 phải có kỳ 1 & Tiên quyết | Hard (N=5) | | | `Chưa bắt đầu` | Nút riêng cho SV tự add môn từng kỳ, validate kỳ 2 phải có kỳ 1 và môn tiên quyết phải hoàn thành trước |
 | **UC-14** | SCR-04 Course Catalog: Danh mục môn mở, tìm kiếm & độ khó tự học | Medium (N=3) | | | `Chưa bắt đầu` | Thẻ môn học, số TC, độ khó ⭐, tự học h/tuần, nút Tonal Button "Chiến lược >" |
 | **UC-15** | SCR-04 Xử lý Shimmer Skeleton khi tải & Empty State khi tìm kiếm rỗng | Simple (N=2) | | | `Chưa bắt đầu` | Khi tìm từ khóa không có môn (VD: XYZ99) hiện kính lúp buồn + nút Xóa bộ lọc |
 | **UC-16** | SCR-05 Course Strategy: Header môn PRM393 & 3 badge thông số | Simple (N=2) | | | `Chưa bắt đầu` | 3 badge: 3 Tín chỉ, Độ khó 4/5 ⭐, Tiên quyết PRO192 ✅. Ẩn hoàn toàn Bottom Bar |
@@ -87,6 +88,7 @@
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
 | **UC-26** | SCR-07 Semester Summary: Thẻ Hero KPI (5 Môn, 15 TC, GPA 3.65, 26h tự học) | Simple (N=2) | | | `Chưa bắt đầu` | Khôi phục Bottom Bar; 4 nhãn KPI chia 2 hàng: Lộ trình hợp lệ, Học phí 14.250.000đ |
+| **UC-26B**| SCR-07 Nút "Đã hoàn thành kỳ học": Tự động lưu các môn vào Môn Đã Học & Tích lũy TC | Medium (N=4) | | | `Chưa bắt đầu` | Tự động chuyển các môn trong kỳ thành Môn đã hoàn thành, cộng dồn accumulatedCredits và update status |
 | **UC-27** | SCR-07 Danh sách 5 môn học kèm mục tiêu điểm (A / B+) và tích xanh ✅ | Simple (N=2) | | | `Chưa bắt đầu` | Hiển thị PRM393, SWE302, AIE411, PRM323, OSG209 thẻ nhỏ gọn, căn gióng đẹp mắt |
 | **UC-28** | SCR-07 Tạo file tài liệu PDF Blueprint A4 Kế hoạch học tập | Medium (N=4) | | | `Chưa bắt đầu` | Dựng bằng pdf & printing package: Header, bảng KPI, bảng điểm & giờ tự học từng môn |
 | **UC-29** | SCR-07 Upload file PDF lên Firebase Storage reports/{uid}/... & hiển thị progress | Hard (N=5) | | | `Chưa bắt đầu` | Thanh tiến trình % tải lên, lấy download URL thật trên Cloud Storage (bucket Blaze) |
@@ -97,7 +99,7 @@
 ### 🔷 NHÓM 6: HỒ SƠ CÁ NHÂN & FIREBASE DEMO (SCR-08)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-31** | SCR-08 Profile: Thẻ sinh viên Trần Hoàng Long, MSSV SE180504, GPA 3.42 | Simple (N=2) | | | `Chưa bắt đầu` | Avatar tròn, pill Đã tích lũy: 90 / 145 TC và pill ⭐ GPA: 3.42 (Giỏi) |
+| **UC-31** | SCR-08 Profile: Thẻ sinh viên & Modal Chỉnh sửa hồ sơ (Tên, Ảnh, MSSV, GPA mục tiêu) | Medium (N=3) | | | `Chưa bắt đầu` | Avatar tròn, nút Chỉnh sửa hồ sơ, modal cập nhật Họ tên, MSSV, ảnh đại diện, GPA mục tiêu lên Firestore |
 | **UC-32** | SCR-08 Thẻ học kỳ Fall 2024: Nút "Chi tiết >" mở lại màn hình SCR-07 | Simple (N=1) | | | `Chưa bắt đầu` | Touch target 48dp, chuyển hướng mượt mà sang bản tổng kết kế hoạch đã lưu |
 | **UC-33** | SCR-08 Nhóm cài đặt 3 Switch: Nhắc hạn Lab, Cảnh báo quá tải, Sync Calendar | Simple (N=2) | | | `Chưa bắt đầu` | Chiều cao mỗi tile >= 56dp, đồng bộ trạng thái toggle tức thời lên Cloud Firestore |
 | **UC-34** | SCR-08 Firebase Demo Showcase: Crashlytics test, Remote Config & FCM inbox | Medium (N=4) | | | `Chưa bắt đầu` | Nút test Crashlytics (non-fatal error & crash), hiển thị giá trị Remote Config động |

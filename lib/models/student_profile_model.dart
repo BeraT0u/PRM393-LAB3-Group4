@@ -2,6 +2,7 @@ class StudentProfileModel {
   final String uid;
   final String fullName;
   final String studentId;
+  final String? email;
   final int accumulatedCredits;
   final int totalGraduationCredits;
   final double currentGpa;
@@ -11,11 +12,13 @@ class StudentProfileModel {
   final bool notifyLabDeadlines;
   final bool autoWarnWorkload;
   final bool syncGoogleCalendar;
+  final bool isNewStudent;
 
   const StudentProfileModel({
     required this.uid,
     required this.fullName,
     required this.studentId,
+    this.email,
     this.accumulatedCredits = 90,
     this.totalGraduationCredits = 145,
     this.currentGpa = 3.42,
@@ -25,12 +28,14 @@ class StudentProfileModel {
     this.notifyLabDeadlines = true,
     this.autoWarnWorkload = true,
     this.syncGoogleCalendar = false,
+    this.isNewStudent = false,
   });
 
   StudentProfileModel copyWith({
     String? uid,
     String? fullName,
     String? studentId,
+    String? email,
     int? accumulatedCredits,
     int? totalGraduationCredits,
     double? currentGpa,
@@ -40,11 +45,13 @@ class StudentProfileModel {
     bool? notifyLabDeadlines,
     bool? autoWarnWorkload,
     bool? syncGoogleCalendar,
+    bool? isNewStudent,
   }) {
     return StudentProfileModel(
       uid: uid ?? this.uid,
       fullName: fullName ?? this.fullName,
       studentId: studentId ?? this.studentId,
+      email: email ?? this.email,
       accumulatedCredits: accumulatedCredits ?? this.accumulatedCredits,
       totalGraduationCredits: totalGraduationCredits ?? this.totalGraduationCredits,
       currentGpa: currentGpa ?? this.currentGpa,
@@ -54,6 +61,7 @@ class StudentProfileModel {
       notifyLabDeadlines: notifyLabDeadlines ?? this.notifyLabDeadlines,
       autoWarnWorkload: autoWarnWorkload ?? this.autoWarnWorkload,
       syncGoogleCalendar: syncGoogleCalendar ?? this.syncGoogleCalendar,
+      isNewStudent: isNewStudent ?? this.isNewStudent,
     );
   }
 
@@ -62,6 +70,7 @@ class StudentProfileModel {
       'uid': uid,
       'fullName': fullName,
       'studentId': studentId,
+      'email': email,
       'accumulatedCredits': accumulatedCredits,
       'totalGraduationCredits': totalGraduationCredits,
       'currentGpa': currentGpa,
@@ -71,6 +80,7 @@ class StudentProfileModel {
       'notifyLabDeadlines': notifyLabDeadlines,
       'autoWarnWorkload': autoWarnWorkload,
       'syncGoogleCalendar': syncGoogleCalendar,
+      'isNewStudent': isNewStudent,
     };
   }
 
@@ -79,6 +89,7 @@ class StudentProfileModel {
       uid: docId,
       fullName: map['fullName'] ?? 'Trần Hoàng Long',
       studentId: map['studentId'] ?? 'SE180504',
+      email: map['email'],
       accumulatedCredits: (map['accumulatedCredits'] as num?)?.toInt() ?? 90,
       totalGraduationCredits: (map['totalGraduationCredits'] as num?)?.toInt() ?? 145,
       currentGpa: (map['currentGpa'] as num?)?.toDouble() ?? 3.42,
@@ -88,6 +99,7 @@ class StudentProfileModel {
       notifyLabDeadlines: map['notifyLabDeadlines'] ?? true,
       autoWarnWorkload: map['autoWarnWorkload'] ?? true,
       syncGoogleCalendar: map['syncGoogleCalendar'] ?? false,
+      isNewStudent: map['isNewStudent'] ?? false,
     );
   }
 }

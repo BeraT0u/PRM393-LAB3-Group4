@@ -251,19 +251,26 @@ User Interactions: Vuốt xuống để refresh (Pull-to-refresh); chạm Hero C
 Navigation: Tab 2 ➔ SCR-03; Tab 3 ➔ SCR-04; Tab 4 ➔ SCR-08.
 Important UI Constraints: Các thẻ Tips khống chế text trong tối đa 2 dòng; khoảng cách các khối 16px tạo độ thoáng.
 3.3. SCR-03 — Completed Courses (Môn Đã Hoàn Thành)
-Layout: Scaffold → AppBar("Môn Đã Học") → Header cố định (Tiến độ tốt nghiệp + Filter Chips) → Expanded → ListView.separated(padding: EdgeInsets.only(bottom: 96)).
+Layout: Scaffold → AppBar("Môn Đã Học") → Header cố định (Tiến độ tốt nghiệp + Filter Chips + Nút "+ Thêm môn đã học theo kỳ") → Expanded → ListView.separated(padding: EdgeInsets.only(bottom: 96)).
 Components:
 Top App Bar: Icon Logo + Tiêu đề "Môn Đã Học" (Inter SemiBold 18px) + Icon chuông.
 Card Tiến độ Tốt nghiệp: "90 / 145 Tín chỉ (62%) • GPA: 3.42", thanh progress bar xanh #2563EB trên nền xám #EAE1D0.
-Filter Chips: [Tất cả], [Kỳ 4], [Kỳ 3].
+Action Header: Nút Tonal "+ Thêm môn đã học theo kỳ" (FilledButton.tonal cao 40dp, touch target 48dp).
+Filter Chips: [Tất cả], [Kỳ 4], [Kỳ 3], [Kỳ 2], [Kỳ 1].
 Thẻ môn đã hoàn thành: Tên môn, số TC, điểm tổng kết (8.8 (A) ✅), và dòng chú thích: "Điều kiện: Đã mở khóa tiên quyết cho PRM393.".
+Modal Sheet "Thêm môn đã học theo kỳ":
+- Dropdown chọn Kỳ học (Kỳ 1 .. Kỳ 9).
+- Danh sách môn học để chọn và nhập điểm tổng kết.
+- Quy tắc thẩm định nghiệp vụ (Validation Rules):
+  1. Ràng buộc tiến trình kỳ học: Muốn thêm môn vào Kỳ N, bắt buộc Kỳ 1 đến Kỳ N-1 đã phải có môn học hoàn thành ("kì 2 phải có kì 1"). Nếu chưa có, báo lỗi đỏ: "⚠️ Cần cập nhật môn hoàn thành của Kỳ N-1 trước khi thêm Kỳ N".
+  2. Ràng buộc môn tiên quyết: Môn được thêm vào Kỳ N phải có các môn tiên quyết nằm trong danh sách các môn đã hoàn thành ở các kỳ trước đó (< N). Nếu chưa thỏa mãn, báo lỗi đỏ: "⚠️ Chưa hoàn thành môn tiên quyết [Mã môn] nên không thể thêm môn này".
 Bottom Navigation Bar (Tab 2 Đã học Active).
 States:
 Default: Danh sách các môn đã Pass.
-Empty: Khi chọn một kỳ chưa có dữ liệu ➔ Hiện Empty State.
-User Interactions: Chạm các chip để lọc danh sách theo kỳ học; chạm thẻ môn để xem bảng điểm chi tiết.
+Empty: Khi tài khoản mới chưa có môn nào hoặc chọn kỳ chưa có môn ➔ Hiện Empty State + Nút gợi ý "Thêm môn đã học ngay".
+User Interactions: Chạm các chip để lọc danh sách theo kỳ học; chạm thẻ môn để xem bảng điểm chi tiết; chạm "+ Thêm môn đã học theo kỳ" để mở form khai báo.
 Navigation: Chạm Bottom Bar để chuyển tab; nút Back trên thiết bị đưa về SCR-02.
-Important UI Constraints: Dòng chữ "Điều kiện: ..." gióng thẳng hàng với tiêu đề môn, không thụt lề; badge điểm dùng màu xanh lá dịu mắt (#DCFCE7 / #15803D).
+Important UI Constraints: Dòng chữ "Điều kiện: ..." gióng thẳng hàng với tiêu đề môn, không thụt lề; badge điểm dùng màu xanh lá dịu mắt (#DCFCE7 / #15803D). Dialog/BottomSheet thêm môn có xử lý validate đầy đủ cả 2 điều kiện kỳ học và tiên quyết.
 3.4. SCR-04 — Course Catalog & Khám phá Chiến lược
 Layout: Scaffold → AppBar("Tìm Môn") → Khối SearchBar & Filter Chips cố định → Expanded → ListView.separated(padding: EdgeInsets.only(bottom: 96)).
 Components:
@@ -333,18 +340,27 @@ Thẻ Hero KPI: "5 Môn học • 15 Tín chỉ", 4 nhãn chia thành 2 hàng ng
 Hàng 1: [✅ Lộ trình hợp lệ (0 Xung đột)] | [⏱️ Tự học: 26h/tuần (Cân bằng)]
 Hàng 2: [🎯 GPA Mục tiêu: 3.65] | [Học phí: 14.250.000 đ]
 Danh sách "Chiến lược từng môn (5)": 5 thẻ môn nhỏ gọn (PRM393, SWE302, AIE411, PRM323, OSG209) hiển thị mục tiêu điểm (A / B+) và giờ tự học kèm dấu tích xanh ✅.
-Hộp hành động xuất file:
+Hộp hành động kế hoạch & xuất file:
+Nút Đánh dấu hoàn thành: "✅ Đã Hoàn Thành Kỳ Học" (FilledButton cao 48dp, nền xanh lá #16A34A, bo góc 8dp).
+- Khi bấm: Tự động chuyển toàn bộ các môn trong kế hoạch sang danh mục `completed_courses`, gán điểm số đạt chuẩn, cộng dồn số tín chỉ vào `accumulatedCredits` của sinh viên, cập nhật trạng thái kế hoạch thành Đã hoàn thành và chuyển sang SCR-03.
 Nút chính: "📄 Xuất PDF Kế Hoạch & Chiến Lược (A4)" (FilledButton cao 48dp, nền #2563EB, bo góc 8dp).
 2 nút phụ: "Đồng bộ Lịch Ôn Tập" và "Chia sẻ Kế Hoạch".
 Bottom Navigation Bar (Tab 3 Tìm môn Active).
-States: Hiển thị trọn vẹn bản kế hoạch hợp lệ không có lỗi; nút xuất file sẵn sàng bấm.
-User Interactions: Bấm nút "📄 Xuất PDF Kế Hoạch" ➔ Mở modal xem trước bản in khổ A4 (tỷ lệ 1 : 1.414).
+States: Hiển thị trọn vẹn bản kế hoạch hợp lệ không có lỗi; nút Đã hoàn thành và nút xuất file sẵn sàng bấm.
+User Interactions: Bấm nút "✅ Đã Hoàn Thành Kỳ Học" ➔ Lưu các môn thành Đã học và cập nhật tiến độ; Bấm nút "📄 Xuất PDF Kế Hoạch" ➔ Mở modal xem trước bản in khổ A4 (tỷ lệ 1 : 1.414).
 Navigation: Màn hình này cũng được mở trực tiếp khi bấm vào thẻ học kỳ ở SCR-08. Nút Back [←] quay lại màn hình trước.
-Important UI Constraints: Toàn bộ thẻ và nút xuất PDF nằm hoàn toàn phía trên thanh Bottom Bar 64dp, không bị che khuất.
+Important UI Constraints: Toàn bộ thẻ và các nút hành động nằm hoàn toàn phía trên thanh Bottom Bar 64dp, không bị che khuất.
 3.9. SCR-08 — Profile & Settings & Overlay_Logout
 Layout: Scaffold → AppBar("Cá Nhân") → SingleChildScrollView(padding: EdgeInsets.fromLTRB(16, 12, 16, 96)) → NavigationBar (Tab Cá nhân Active).
 Components:
-Thẻ Sinh viên: Avatar tròn 40dp, tên Trần Hoàng Long, MSSV SE180504, 2 pill chỉ số: 📘 Đã tích lũy: 90 / 145 TC và ⭐ GPA: 3.42 (Giỏi).
+Thẻ Sinh viên: Avatar tròn 40dp (hoặc ảnh Google/tự chọn), tên sinh viên, MSSV, 2 pill chỉ số: 📘 Đã tích lũy: X / 145 TC và ⭐ GPA: Y (Xếp loại).
+- Nút chỉnh sửa hồ sơ: Nút "Chỉnh sửa hồ sơ" (Tonal Button hoặc icon Edit ở góc thẻ).
+- Modal Sheet "Thiết lập Thông tin Cá nhân":
+  + Nhập Họ và tên (fullName).
+  + Nhập Mã số sinh viên (studentId).
+  + Chọn / nhập URL ảnh đại diện (avatarUrl) hoặc đồng bộ ảnh từ tài khoản Google.
+  + Nhập GPA mục tiêu và Tổng tín chỉ chương trình đào tạo.
+  + Nút "Lưu Thông Tin" cập nhật trực tiếp lên Firestore `students/{uid}`.
 Thẻ Học kỳ Fall 2024: Có nút Chi tiết > màu xanh #2563EB (touch target 48dp).
 Nhóm cài đặt Course Planner (3 switch):
 Switch 1: "Nhắc hạn nộp Lab & Milestone đồ án" (Bật).
@@ -352,11 +368,39 @@ Switch 2: "Tự động cảnh báo quá tải & tiên quyết" (Bật).
 Switch 3: "Đồng bộ Lịch Ôn Tập sang Google Calendar" (Tắt).
 Nút nguy hiểm: "[-> Đăng xuất tài khoản" (OutlinedButton đỏ #DC2626, cao 48dp).
 Dialog Modal Overlay_Logout: Hộp thoại 320dp bo góc 16dp, tiêu đề "Đăng xuất tài khoản?", 2 nút Hủy và Đăng xuất (50/50).
-States: Switch toggle bật/tắt mượt mà; popup logout hiển thị trên nền mờ barrierColor: Colors.black40.
-User Interactions: Bấm vào thẻ Học kỳ Fall 2024 ➔ Mở SCR-07; Bấm Đăng xuất ➔ Mở Overlay_Logout.
+States: Switch toggle bật/tắt mượt mà; popup logout hiển thị trên nền mờ barrierColor: Colors.black40; form chỉnh sửa thông tin có validate không được để trống họ tên.
+User Interactions: Bấm "Chỉnh sửa hồ sơ" ➔ Mở form cập nhật; Bấm vào thẻ Học kỳ Fall 2024 ➔ Mở SCR-07; Bấm Đăng xuất ➔ Mở Overlay_Logout.
 Navigation:
 Trên Overlay_Logout: Bấm Hủy ➔ Đóng popup; Bấm Đăng xuất ➔ Xóa session và gọi Navigator.pushNamedAndRemoveUntil('/login', (route) => false) về SCR-01.
-Important UI Constraints: Mọi switch list tile có chiều cao tối thiểu 56dp; nút Đăng xuất có viền đỏ cảnh báo rõ ràng.
+Important UI Constraints: Mọi switch list tile có chiều cao tối thiểu 56dp; nút Đăng xuất có viền đỏ cảnh báo rõ ràng; modal chỉnh sửa hồ sơ có padding bàn phím ảo (viewInsets).
+
+### 3.10. Kiến trúc Đa tài khoản Persona & Xử lý Tài khoản Mới (Onboarding Flow)
+
+Hệ thống hỗ trợ 3 tài khoản Persona định danh mẫu và cơ chế xử lý tài khoản mới:
+
+1. **Persona 1: Trần Hoàng Long (Standard Mid-term Student)**
+   - **Định danh / Email**: `longth.se180504@gmail.com` (hoặc email mặc định cấu hình)
+   - **Thông tin**: SE180504, Tích lũy: `90 / 145 TC` (62%), GPA: `3.42`, Mục tiêu: `3.65`.
+   - **Kịch bản Demo**: Đang có kế hoạch học kỳ Fall 2024 ở trạng thái XUNG ĐỘT QUÁ TẢI (34h/tuần và vi phạm tiên quyết IAE201) ➔ Dùng để demo luồng Phân tích quá tải & Khắc phục xung đột sang 26h (SCR-06A & SCR-06B).
+
+2. **Persona 2: Nguyễn Mai Linh (High-achiever / Honors Senior Student)**
+   - **Định danh / Email**: `linhnm.se170123@gmail.com`
+   - **Thông tin**: SE170123, Tích lũy: `125 / 145 TC` (86%), GPA: `3.82` (Xuất sắc), Mục tiêu: `3.90`.
+   - **Kịch bản Demo**: Đã hoàn thành gần hết chương trình (Kỳ 1 đến Kỳ 7), kế hoạch kỳ tốt nghiệp CÂN BẰNG (15h/tuần, 0 xung đột), hồ sơ mẫu cho sinh viên xuất sắc.
+
+3. **Persona 3: Lê Minh Tuấn (Early-stage / Warning Workload Student)**
+   - **Định danh / Email**: `tuanlm.se190456@gmail.com`
+   - **Thông tin**: SE190456, Tích lũy: `35 / 145 TC` (24%), GPA: `2.65` (Trung bình khá), Mục tiêu: `3.20`.
+   - **Kịch bản Demo**: Sinh viên năm 2 đang chọn quá tải nặng (38h/tuần, vi phạm 2 môn tiên quyết), minh họa hệ thống phát hiện rủi ro học vụ từ sớm.
+
+4. **Tài khoản mới đăng nhập (Chưa được định danh trước)**:
+   - **Trạng thái**: Hồ sơ rỗng (`isNewStudent = true`, `accumulatedCredits = 0`, `passedCourseCodes = []`).
+   - **Giao diện phản hồi**:
+     - Màn hình Home (`SCR-02`): Hiển thị Banner cảnh báo vàng/xanh: *"👋 Chào bạn mới! Hồ sơ học tập của bạn đang trống. Vui lòng thiết lập thông tin cá nhân và cập nhật các môn học đã hoàn thành."* kèm nút hành động *"Thiết lập ngay"*.
+     - Màn hình Đã học (`SCR-03`): Hiển thị Empty State với nút *"Thêm môn đã học theo kỳ"* để sinh viên bắt đầu nhập từ Kỳ 1.
+
+---
+
 Phần 4 — Responsive (Width ≥ 600 dp) & QA Checklist
 4.1. Quy tắc Responsive Tablet / Web (Width ≥ 600 dp)
 Navigation Transition: NavigationBar ở đáy màn hình tự động chuyển đổi thành NavigationRail cố định ở cạnh trái màn hình.

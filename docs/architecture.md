@@ -139,5 +139,50 @@ sequenceDiagram
 | `CourseCatalogViewModel` | Tìm kiếm môn, lọc theo chuyên ngành, quản lý trạng thái loading/empty | `CourseService`, `AnalyticsCrashlyticsService` |
 | `CourseDetailViewModel` | Cung cấp chi tiết môn, cấu trúc điểm 40/30/30, lựa chọn mục tiêu điểm | `CourseService` |
 | `PlanAnalyzerViewModel` | Tính toán số giờ tự học, kiểm tra điều kiện tiên quyết, khóa/mở nút Lưu | `PlanService`, `RemoteConfigService`, `AnalyticsCrashlyticsService` |
-| `SemesterSummaryViewModel` | Tổng hợp KPI kế hoạch kỳ học, kích hoạt xuất bản PDF A4 | `PlanService`, `PdfReportService` |
-| `ProfileViewModel` | Quản lý thiết lập thông báo, trạng thái Remote Config, hành động Đăng xuất | `AuthService`, `RemoteConfigService` |
+| `SemesterSummaryViewModel` | Tổng hợp KPI kế hoạch kỳ học, kích hoạt xuất bản PDF A4, đánh dấu hoàn thành kỳ học chuyển môn sang completed_courses | `PlanService`, `StudentService`, `PdfReportService` |
+| `ProfileViewModel` | Quản lý thiết lập thông báo, trạng thái Remote Config, hành động Đăng xuất, chỉnh sửa thông tin cá nhân | `AuthService`, `StudentService`, `RemoteConfigService` |
+| `CompletedCoursesViewModel` | Quản lý danh mục môn đã học theo kỳ, kiểm tra ràng buộc kỳ học (kỳ 2 phải có kỳ 1) và môn tiên quyết | `StudentService`, `CourseService` |
+
+---
+
+## 5. Thiết kế Đa Persona & Quản lý Tiến độ Môn Học (Multi-Persona & Course Progression)
+
+### 5.1. Mô hình Đa Persona & Xử lý Tài khoản Mới
+1. **Persona 1: Trần Hoàng Long (Standard Student — Demo Lập kế hoạch & Quá tải)**
+   - UID: `student_se180504` (Email: `longth.se180504@gmail.com` hoặc default)
+   - Tích lũy: `90 / 145 TC`, GPA: `3.42`.
+   - Dữ liệu: Kế hoạch Fall 2024 quá tải (34h/tuần, vi phạm IAE201) dùng để demo luồng đổi môn PRM323 sang 26h.
+2. **Persona 2: Nguyễn Mai Linh (High-achiever — Demo Kế hoạch Kỳ cuối)**
+   - UID: `student_se170123` (Email: `linhnm.se170123@gmail.com`)
+   - Tích lũy: `125 / 145 TC`, GPA: `3.82`.
+   - Dữ liệu: Đã hoàn thành Kỳ 1 đến Kỳ 7, kế hoạch kỳ tốt nghiệp Cân bằng (15h/tuần, 0 xung đột).
+3. **Persona 3: Lê Minh Tuấn (Early-stage — Demo Rủi ro Học vụ)**
+   - UID: `student_se190456` (Email: `tuanlm.se190456@gmail.com`)
+   - Tích lũy: `35 / 145 TC`, GPA: `2.65`.
+   - Dữ liệu: Sinh viên năm 2 đang chọn 38h/tuần và vi phạm 2 môn tiên quyết.
+4. **Tài khoản mới không được định danh trước**:
+   - Khi đăng nhập bằng tài khoản Google ngoài 3 tài khoản trên:
+   - Dữ liệu khởi tạo là **Hồ sơ Rỗng** (`accumulatedCredits: 0`, `studentId: ''`, `passedCourseCodes: []`).
+   - App hiển thị thông báo: *"Hồ sơ học tập mới - Chưa có dữ liệu. Vui lòng thiết lập thông tin cá nhân và cập nhật các môn học đã hoàn thành."*
+
+### 5.2. Nghiệp vụ Nghiệm thu Kỳ học (SCR-07: "Đã Hoàn Thành Kỳ Học")
+- Tại màn hình `SCR-07`, nút **"Đã Hoàn Thành Kỳ Học"** kích hoạt luồng:
+  1. Đọc toàn bộ danh sách môn học đã chọn trong `study_plans/{planId}`.
+  2. Ghi danh sách môn này vào collection `completed_courses/{uid}/courses/` với điểm số đạt chuẩn.
+  3. Cộng dồn số tín chỉ của các môn này vào `accumulatedCredits` trong `students/{uid}`.
+  4. Cập nhật trạng thái `isCompleted: true` cho bản kế hoạch.
+  5. Điều hướng người dùng sang `SCR-03` để kiểm tra kết quả tiến độ tích lũy mới.
+
+### 5.3. Nghiệp vụ Khai báo Môn Đã Học theo kỳ (SCR-03: Self-service Completed Courses)
+- Cho phép sinh viên bắt đầu dùng app khi đã học một số kỳ tự khai báo môn đã hoàn thành.
+- **2 Quy tắc ràng buộc cốt lõi (Enforced Business Rules)**:
+  1. **Ràng buộc tiến trình kỳ học**: Kỳ $N$ chỉ được phép khai báo nếu Kỳ $1 \dots N-1$ đã có ít nhất một môn học hoàn thành ("kì 2 phải có kì 1"). Nếu người dùng chọn Kỳ 2 khi Kỳ 1 trống, hệ thống chặn lại và báo lỗi.
+  2. **Ràng buộc điều kiện tiên quyết (Prerequisites)**: Môn học được thêm vào Kỳ $N$ bắt buộc phải có tất cả môn tiên quyết nằm trong tập hợp các môn đã hoàn thành ở các kỳ trước đó ($< N$). Nếu chưa đạt, hệ thống từ chối thêm môn và thông báo mã môn tiên quyết còn thiếu.
+
+### 5.4. Nghiệp vụ Chỉnh sửa Thông tin Cá nhân (SCR-08: Edit Profile)
+- Cho phép người dùng tự setup/chỉnh sửa:
+  - Họ và tên (`fullName`)
+  - Mã số sinh viên (`studentId`)
+  - Ảnh đại diện (`avatarUrl` hoặc đồng bộ ảnh Google)
+  - GPA mục tiêu (`targetGpa`) và Tổng tín chỉ tốt nghiệp (`totalGraduationCredits`)
+- Cập nhật trực tiếp lên Firestore `students/{uid}` và đồng bộ ngay lên toàn bộ ứng dụng.

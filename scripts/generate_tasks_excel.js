@@ -151,12 +151,12 @@ const tasks = [
   {
     category: 'NHÓM 2: MÀN HÌNH ĐĂNG NHẬP & TRANG CHỦ (SCR-01 & SCR-02)',
     id: 'UC-09',
-    functionScreen: 'Xử lý xác thực Google Sign-In & Auth-state Routing (Signed in -> Home)',
+    functionScreen: 'Xử lý Google Sign-In & Đa Persona (3 TK mẫu Long/Linh/Tuấn; TK mới báo rỗng)',
     level: 'Medium (N=3)',
     responsible: '',
     date: '',
     status: 'Chưa bắt đầu',
-    note: 'Bắt sự kiện hủy đăng nhập từ người dùng, dọn dẹp session khi sign-out'
+    note: 'Long (90TC, 34h conflict), Linh (125TC, kỳ tốt nghiệp), Tuấn (35TC, 38h); TK mới báo hồ sơ trống'
   },
   {
     category: 'NHÓM 2: MÀN HÌNH ĐĂNG NHẬP & TRANG CHỦ (SCR-01 & SCR-02)',
@@ -193,12 +193,22 @@ const tasks = [
   {
     category: 'NHÓM 3: TIẾN ĐỘ TÍCH LŨY & DANH MỤC MÔN HỌC (SCR-03, 04, 05)',
     id: 'UC-13',
-    functionScreen: 'SCR-03 Màn hình Môn Đã Học (Completed Courses) & Mở khóa tiên quyết',
+    functionScreen: 'SCR-03 Màn hình Môn Đã Học (Completed Courses) & Thẻ tiến độ 90/145 TC',
     level: 'Medium (N=3)',
     responsible: '',
     date: '',
     status: 'Chưa bắt đầu',
     note: 'Card Tiến độ 90/145 TC (62%), Filter Chips theo kỳ, dòng chú thích mở khóa PRM393'
+  },
+  {
+    category: 'NHÓM 3: TIẾN ĐỘ TÍCH LŨY & DANH MỤC MÔN HỌC (SCR-03, 04, 05)',
+    id: 'UC-13B',
+    functionScreen: 'SCR-03 Modal Thêm môn đã học theo kỳ: Thẩm định kỳ 2 phải có kỳ 1 & Tiên quyết',
+    level: 'Hard (N=5)',
+    responsible: '',
+    date: '',
+    status: 'Chưa bắt đầu',
+    note: 'Nút riêng cho SV tự add môn từng kỳ, validate kỳ 2 phải có kỳ 1 và môn tiên quyết phải hoàn thành trước'
   },
   {
     category: 'NHÓM 3: TIẾN ĐỘ TÍCH LŨY & DANH MỤC MÔN HỌC (SCR-03, 04, 05)',
@@ -336,6 +346,16 @@ const tasks = [
   },
   {
     category: 'NHÓM 5: TỔNG KẾT KẾ HOẠCH & XUẤT BLUEPRINT PDF (SCR-07)',
+    id: 'UC-26B',
+    functionScreen: 'SCR-07 Nút "Đã hoàn thành kỳ học": Tự động lưu các môn vào Môn Đã Học & Tích lũy TC',
+    level: 'Medium (N=4)',
+    responsible: '',
+    date: '',
+    status: 'Chưa bắt đầu',
+    note: 'Tự động chuyển các môn trong kỳ thành Môn đã hoàn thành, cộng dồn accumulatedCredits và update status'
+  },
+  {
+    category: 'NHÓM 5: TỔNG KẾT KẾ HOẠCH & XUẤT BLUEPRINT PDF (SCR-07)',
     id: 'UC-27',
     functionScreen: 'SCR-07 Danh sách 5 môn học kèm mục tiêu điểm (A / B+) và tích xanh ✅',
     level: 'Simple (N=2)',
@@ -379,12 +399,12 @@ const tasks = [
   {
     category: 'NHÓM 6: HỒ SƠ CÁ NHÂN & FIREBASE DEMO (SCR-08)',
     id: 'UC-31',
-    functionScreen: 'SCR-08 Profile: Thẻ sinh viên Trần Hoàng Long, MSSV SE180504, GPA 3.42',
-    level: 'Simple (N=2)',
+    functionScreen: 'SCR-08 Profile: Thẻ sinh viên & Modal Chỉnh sửa hồ sơ (Tên, Ảnh, MSSV, GPA mục tiêu)',
+    level: 'Medium (N=3)',
     responsible: '',
     date: '',
     status: 'Chưa bắt đầu',
-    note: 'Avatar tròn, pill Đã tích lũy: 90 / 145 TC và pill ⭐ GPA: 3.42 (Giỏi)'
+    note: 'Avatar tròn, nút Chỉnh sửa hồ sơ, modal cập nhật Họ tên, MSSV, ảnh đại diện, GPA mục tiêu lên Firestore'
   },
   {
     category: 'NHÓM 6: HỒ SƠ CÁ NHÂN & FIREBASE DEMO (SCR-08)',

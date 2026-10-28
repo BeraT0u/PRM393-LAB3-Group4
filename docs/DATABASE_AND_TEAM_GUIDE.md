@@ -76,6 +76,27 @@ Dự án đã được cấu hình sẵn để **tất cả thành viên dùng c
 * Nếu thành viên chạy app khi không có mạng hoặc mạng trường học chặn Firebase, **ứng dụng KHÔNG BAO GIỜ bị văng crash**.
 * Hệ thống sẽ tự động dùng dữ liệu Fallback nội bộ (`DatabaseSeeder.sampleCourses`), mọi thao tác tìm kiếm, lọc, tính giờ tự học và đổi môn vẫn hoạt động hoàn hảo.
 
+### 3.4. Hệ thống 3 Persona Định Danh & Khởi Tạo Tài Khoản Mới
+Dự án thiết kế sẵn 3 tài khoản Persona phục vụ demo và cơ chế xử lý tài khoản mới:
+1. **Persona 1: Trần Hoàng Long** (`student_se180504`, email: `longth.se180504@gmail.com`):
+   - Sinh viên năm 3, tích lũy 90/145 TC, GPA 3.42. Kế hoạch Fall 2024 đang bị xung đột quá tải 34h (vi phạm môn IAE201) phục vụ demo luồng khắc phục sang 26h.
+2. **Persona 2: Nguyễn Mai Linh** (`student_se170123`, email: `linhnm.se170123@gmail.com`):
+   - Sinh viên năm cuối, tích lũy 125/145 TC, GPA 3.82. Đã hoàn thành từ Kỳ 1 đến Kỳ 7, kế hoạch kỳ tốt nghiệp Cân bằng 15h, phục vụ demo sinh viên xuất sắc.
+3. **Persona 3: Lê Minh Tuấn** (`student_se190456`, email: `tuanlm.se190456@gmail.com`):
+   - Sinh viên năm 2, tích lũy 35/145 TC, GPA 2.65. Đang chọn quá tải 38h và vi phạm 2 môn tiên quyết, phục vụ demo phát hiện rủi ro học vụ.
+4. **Tài khoản mới không định danh**:
+   - Khi đăng nhập bằng tài khoản Google mới, hệ thống **không tự sao chép dữ liệu của Long** mà khởi tạo Hồ sơ Rỗng (`isNewStudent = true`, 0 TC).
+   - Hệ thống hiển thị thông báo: *"Hồ sơ học tập mới - Chưa có dữ liệu. Vui lòng thiết lập thông tin cá nhân và cập nhật các môn học đã hoàn thành."*
+
+### 3.5. Nghiệp Vụ Nghiệm Thu Kỳ Học & Khai Báo Môn Đã Học
+1. **Nút "✅ Đã Hoàn Thành Kỳ Học" trên SCR-07**:
+   - Tự động lấy tất cả các môn trong kế hoạch kỳ đó lưu vào `completed_courses`, cộng dồn số tín chỉ vào `accumulatedCredits` của sinh viên, đánh dấu kế hoạch là đã hoàn thành và chuyển sang SCR-03.
+2. **Nút "+ Thêm môn đã học theo kỳ" trên SCR-03 (Bắt buộc kiểm tra 2 điều kiện)**:
+   - **Ràng buộc tiến trình kỳ học**: Kỳ $N$ chỉ được phép thêm khi các Kỳ $1 \dots N-1$ đã có môn học hoàn thành ("kì 2 phải có kì 1"). Nếu Kỳ 1 chưa có môn mà chọn Kỳ 2 $\to$ Báo lỗi.
+   - **Ràng buộc môn tiên quyết**: Môn được thêm vào Kỳ $N$ phải có tất cả các môn tiên quyết nằm trong danh mục các môn đã Pass ở các kỳ trước đó ($< N$). Nếu chưa có $\to$ Báo lỗi.
+3. **Chỉnh sửa hồ sơ cá nhân trên SCR-08**:
+   - Nút "Chỉnh sửa hồ sơ" cho phép người dùng tự setup tên (`fullName`), MSSV (`studentId`), ảnh đại diện (`avatarUrl` / ảnh Google), và GPA mục tiêu (`targetGpa`).
+
 ---
 
 ## ☁️ 4. Dịch vụ Lưu trữ File (Cloud Storage)

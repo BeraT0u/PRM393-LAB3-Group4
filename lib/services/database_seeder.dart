@@ -151,9 +151,10 @@ class DatabaseSeeder {
     ),
   ];
 
-  /// Hồ sơ sinh viên mẫu mặc định (Trần Hoàng Long - SE180504)
+  /// Hồ sơ Persona 1: Trần Hoàng Long (SE180504 - Tiêu chuẩn, kịch bản kế hoạch 34h -> 26h)
   static final StudentProfileModel defaultStudent = StudentProfileModel(
     uid: 'student_se180504',
+    email: 'longth.se180504@gmail.com',
     fullName: 'Trần Hoàng Long',
     studentId: 'SE180504',
     accumulatedCredits: 90,
@@ -164,7 +165,117 @@ class DatabaseSeeder {
     notifyLabDeadlines: true,
     autoWarnWorkload: true,
     syncGoogleCalendar: false,
+    isNewStudent: false,
   );
+
+  /// Hồ sơ Persona 2: Nguyễn Mai Linh (SE170123 - Sinh viên xuất sắc năm cuối, 125/145 TC)
+  static final StudentProfileModel personaLinh = StudentProfileModel(
+    uid: 'student_se170123',
+    email: 'linhnm.se170123@gmail.com',
+    fullName: 'Nguyễn Mai Linh',
+    studentId: 'SE170123',
+    accumulatedCredits: 125,
+    totalGraduationCredits: 145,
+    currentGpa: 3.82,
+    targetGpa: 3.90,
+    passedCourseCodes: const [
+      'PRO192', 'MAD101', 'CSD201', 'DBI202', 'MAS291',
+      'PRM393', 'SWE302', 'AIE411', 'PRM323', 'OSG209', 'NWC203', 'IAE201'
+    ],
+    notifyLabDeadlines: true,
+    autoWarnWorkload: true,
+    syncGoogleCalendar: true,
+    isNewStudent: false,
+  );
+
+  /// Hồ sơ Persona 3: Lê Minh Tuấn (SE190456 - Sinh viên năm 2, nguy cơ học vụ, 35/145 TC)
+  static final StudentProfileModel personaTuan = StudentProfileModel(
+    uid: 'student_se190456',
+    email: 'tuanlm.se190456@gmail.com',
+    fullName: 'Lê Minh Tuấn',
+    studentId: 'SE190456',
+    accumulatedCredits: 35,
+    totalGraduationCredits: 145,
+    currentGpa: 2.65,
+    targetGpa: 3.20,
+    passedCourseCodes: const ['PRO192', 'MAD101'],
+    notifyLabDeadlines: false,
+    autoWarnWorkload: true,
+    syncGoogleCalendar: false,
+    isNewStudent: false,
+  );
+
+  /// Khởi tạo hồ sơ rỗng cho tài khoản Google mới chưa định danh
+  static StudentProfileModel getEmptyProfile(
+    String uid, {
+    String? email,
+    String? displayName,
+    String? photoUrl,
+  }) {
+    return StudentProfileModel(
+      uid: uid,
+      email: email,
+      fullName: (displayName != null && displayName.trim().isNotEmpty)
+          ? displayName
+          : 'Sinh viên mới',
+      studentId: '',
+      accumulatedCredits: 0,
+      totalGraduationCredits: 145,
+      currentGpa: 0.0,
+      targetGpa: 3.50,
+      avatarUrl: photoUrl,
+      passedCourseCodes: const [],
+      notifyLabDeadlines: true,
+      autoWarnWorkload: true,
+      syncGoogleCalendar: false,
+      isNewStudent: true, // Đánh dấu tài khoản cần thiết lập
+    );
+  }
+
+  /// Nhận diện hồ sơ phù hợp dựa trên Email hoặc UID người dùng
+  static StudentProfileModel resolveProfileForUser({
+    required String uid,
+    String? email,
+    String? displayName,
+    String? photoUrl,
+  }) {
+    final lowerEmail = (email ?? '').toLowerCase().trim();
+
+    // 1. Khớp Persona 1: Trần Hoàng Long
+    if (lowerEmail.contains('long') || uid == defaultStudent.uid) {
+      return defaultStudent.copyWith(
+        uid: uid,
+        email: email ?? defaultStudent.email,
+        avatarUrl: photoUrl ?? defaultStudent.avatarUrl,
+      );
+    }
+
+    // 2. Khớp Persona 2: Nguyễn Mai Linh
+    if (lowerEmail.contains('linh') || uid == personaLinh.uid) {
+      return personaLinh.copyWith(
+        uid: uid,
+        email: email ?? personaLinh.email,
+        avatarUrl: photoUrl ?? personaLinh.avatarUrl,
+      );
+    }
+
+    // 3. Khớp Persona 3: Lê Minh Tuấn
+    if (lowerEmail.contains('tuan') || uid == personaTuan.uid) {
+      return personaTuan.copyWith(
+        uid: uid,
+        email: email ?? personaTuan.email,
+        avatarUrl: photoUrl ?? personaTuan.avatarUrl,
+      );
+    }
+
+    // 4. Tài khoản mới hoàn toàn: Khởi tạo hồ sơ rỗng để sinh viên tự điền
+    return getEmptyProfile(
+      uid,
+      email: email,
+      displayName: displayName,
+      photoUrl: photoUrl,
+    );
+  }
 
   /// Kế hoạch học tập ban đầu (Trạng thái XUNG ĐỘT QUÁ TẢI 34h: PRM393, SWE302, AIE411, IAE201)
   static StudyPlanModel getInitialConflictPlan(String userId) {
