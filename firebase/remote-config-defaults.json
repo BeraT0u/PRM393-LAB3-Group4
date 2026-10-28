@@ -1,0 +1,18 @@
+{
+  "parameters": {
+    "max_safe_workload_hours": {
+      "defaultValue": {
+        "value": "25"
+      },
+      "description": "Ngưỡng số giờ tự học an toàn tối đa khuyến nghị mỗi tuần trước khi kích hoạt cảnh báo quá tải",
+      "valueType": "NUMBER"
+    },
+    "enable_study_tips": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Bật/Tắt hiển thị các mẹo học tập (Study Tips) trên màn hình Home và Chi tiết môn học",
+      "valueType": "BOOLEAN"
+    }
+  }
+}

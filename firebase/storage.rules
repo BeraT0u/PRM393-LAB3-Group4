@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// Cloud Storage Security Rules for EduPlan Mobile (PRM393 Lab 3)
+// Enforces per-user directory isolation: reports/{uid}/{fileName}
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /reports/{userId}/{fileName} {
+      // Cho phép người dùng đọc và ghi file báo cáo chỉ trong thư mục mang chính UID của họ
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Mặc định từ chối mọi truy cập trái phép khác
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
