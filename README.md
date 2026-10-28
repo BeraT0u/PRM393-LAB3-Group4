@@ -10,6 +10,8 @@
 
 ## 📌 1. Giới thiệu tổng quan dự án (Project Overview)
 
+> 📖 **HƯỚNG DẪN DÀNH CHO THÀNH VIÊN NHÓM**: Xem chi tiết tại [docs/DATABASE_AND_TEAM_GUIDE.md](file:///H:/Study/2026_fall/PRM392/Lab3/docs/DATABASE_AND_TEAM_GUIDE.md) để biết cách clone code, cấu hình Firebase dùng chung và khởi chạy app thành công trên mọi máy tính.
+
 **EduPlan** là ứng dụng di động hỗ trợ sinh viên lập kế hoạch học tập theo kỳ học, theo dõi tiến độ tích lũy tín chỉ tốt nghiệp, dự báo độ khó và khối lượng tự học của từng môn. Ứng dụng tích hợp hệ thống phát hiện quá tải thông minh (Workload Analyzer) nhằm cảnh báo sinh viên khi tổng giờ tự học vượt quá ngưỡng an toàn hoặc vi phạm điều kiện môn tiên quyết, đồng thời hỗ trợ xuất bản kế hoạch học tập ra định dạng tài liệu PDF A4.
 
 ---
@@ -48,6 +50,7 @@ PRM393_Lab3/
 │   ├── storage.rules                   # Quy tắc bảo mật phân quyền theo per-user path
 │   └── remote-config-defaults.json     # Giá trị mặc định in-app của Remote Config
 ├── docs/
+│   ├── DATABASE_AND_TEAM_GUIDE.md      # Hướng dẫn chi tiết cài đặt và database cho thành viên nhóm
 │   ├── design-traceability.md          # Stage 1: Bảng ma trận ánh xạ 9 màn hình và 3 flows
 │   ├── architecture.md                 # Stage 2: Bản vẽ kiến trúc MVVM, Mermaid diagrams
 │   ├── analytics-plan.md               # Stage 5: Bảng kế hoạch 8 sự kiện đo lường Analytics
