@@ -37,13 +37,13 @@
 ### 🔷 NHÓM 1: REUSABLE UI COMPONENTS (Thành phần giao diện dùng chung)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-01** | Bộ nút bấm chuẩn Design System (Primary, Tonal, Destructive Button) | Simple (N=2) | | | `Chưa bắt đầu` | Cao 48-52dp, touch target >= 48dp, các state: Default, Pressed, Disabled, Spinner |
-| **UC-02** | Thẻ môn học chiến lược (CourseStrategyCard) & State vi phạm viền đỏ | Medium (N=3) | | | `Chưa bắt đầu` | Hiển thị độ khó ⭐, giờ tự học, viền 1px solid, biến thể Conflict viền đỏ 1.5px |
-| **UC-03** | Thanh tìm kiếm (AppSearchBar) & Bộ lọc Filter Chips chuyên ngành | Simple (N=2) | | | `Chưa bắt đầu` | Ô Search cao 48dp bo góc 8dp, các chip: Tất cả, Chuyên ngành SE, Cơ sở |
-| **UC-04** | Bộ Badge trạng thái (StatusBadge / Tag Pill) chuẩn tương phản WCAG | Simple (N=1) | | | `Chưa bắt đầu` | Success (xanh lá #DCFCE7), Warning (vàng nâu #FEF3C7), Danger (đỏ #FEE2E2) |
-| **UC-05** | Banner báo động đỏ quá tải & vi phạm tiên quyết (AppAlertBanner) | Simple (N=1) | | | `Chưa bắt đầu` | Nền đỏ nhạt #FEE2E2, viền đỏ #DC2626, icon ⚠️, chữ đỏ đậm #B91C1C |
-| **UC-06** | Trạng thái Shimmer Loading (Skeleton) & Empty State tìm kiếm rỗng | Simple (N=2) | | | `Chưa bắt đầu` | Shimmer xám #EAE1D0; Empty state icon kính lúp + nút "Xóa bộ lọc" |
-| **UC-07** | Khung điều hướng chung MainScaffold & Responsive NavigationRail | Medium (N=3) | | | `Chưa bắt đầu` | NavigationBar 64dp 4 tab (Mobile) tự chuyển sang NavigationRail khi width >= 600dp |
+| **UC-01** | Bộ nút bấm chuẩn Design System (Primary, Tonal, Destructive Button) | Simple (N=2) | | 28/10/2026 | `Đã commit` | Cao 48-52dp, touch target >= 48dp, các state: Default, Pressed, Disabled, Spinner |
+| **UC-02** | Thẻ môn học chiến lược (CourseStrategyCard) & State vi phạm viền đỏ | Medium (N=3) | | 28/10/2026 | `Đã commit` | Hiển thị độ khó ⭐, giờ tự học, viền 1px solid, biến thể Conflict viền đỏ 1.5px |
+| **UC-03** | Thanh tìm kiếm (AppSearchBar) & Bộ lọc Filter Chips chuyên ngành | Simple (N=2) | | 28/10/2026 | `Đã commit` | Ô Search cao 48dp bo góc 8dp, các chip: Tất cả, Chuyên ngành SE, Cơ sở |
+| **UC-04** | Bộ Badge trạng thái (StatusBadge / Tag Pill) chuẩn tương phản WCAG | Simple (N=1) | | 28/10/2026 | `Đã commit` | Success (xanh lá #DCFCE7), Warning (vàng nâu #FEF3C7), Danger (đỏ #FEE2E2) |
+| **UC-05** | Banner báo động đỏ quá tải & vi phạm tiên quyết (AppAlertBanner) | Simple (N=1) | | 28/10/2026 | `Đã commit` | Nền đỏ nhạt #FEE2E2, viền đỏ #DC2626, icon ⚠️, chữ đỏ đậm #B91C1C |
+| **UC-06** | Trạng thái Shimmer Loading (Skeleton) & Empty State tìm kiếm rỗng | Simple (N=2) | | 28/10/2026 | `Đã commit` | Shimmer xám #EAE1D0; Empty state icon kính lúp + nút "Xóa bộ lọc" |
+| **UC-07** | Khung điều hướng chung MainScaffold & Responsive NavigationRail | Medium (N=3) | | 28/10/2026 | `Đã commit` | NavigationBar 64dp 4 tab (Mobile) tự chuyển sang NavigationRail khi width >= 600dp |
 
 ---
 

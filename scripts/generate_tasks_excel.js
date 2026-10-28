@@ -72,8 +72,8 @@ const tasks = [
     functionScreen: 'Bộ nút bấm chuẩn Design System (Primary, Tonal, Destructive Button)',
     level: 'Simple (N=2)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Cao 48-52dp, touch target >= 48dp, các state: Default, Pressed, Disabled, Spinner'
   },
   {
@@ -82,8 +82,8 @@ const tasks = [
     functionScreen: 'Thẻ môn học chiến lược (CourseStrategyCard) & State vi phạm viền đỏ',
     level: 'Medium (N=3)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Hiển thị độ khó ⭐, giờ tự học, viền 1px solid, biến thể Conflict viền đỏ 1.5px'
   },
   {
@@ -92,8 +92,8 @@ const tasks = [
     functionScreen: 'Thanh tìm kiếm (AppSearchBar) & Bộ lọc Filter Chips chuyên ngành',
     level: 'Simple (N=2)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Ô Search cao 48dp bo góc 8dp, các chip: Tất cả, Chuyên ngành SE, Cơ sở'
   },
   {
@@ -102,8 +102,8 @@ const tasks = [
     functionScreen: 'Bộ Badge trạng thái (StatusBadge / Tag Pill) chuẩn tương phản WCAG',
     level: 'Simple (N=1)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Success (xanh lá #DCFCE7), Warning (vàng nâu #FEF3C7), Danger (đỏ #FEE2E2)'
   },
   {
@@ -112,8 +112,8 @@ const tasks = [
     functionScreen: 'Banner báo động đỏ quá tải & vi phạm tiên quyết (AppAlertBanner)',
     level: 'Simple (N=1)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Nền đỏ nhạt #FEE2E2, viền đỏ #DC2626, icon ⚠️, chữ đỏ đậm #B91C1C'
   },
   {
@@ -122,8 +122,8 @@ const tasks = [
     functionScreen: 'Trạng thái Shimmer Loading (Skeleton) & Empty State tìm kiếm rỗng',
     level: 'Simple (N=2)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Shimmer xám #EAE1D0; Empty state icon kính lúp + nút "Xóa bộ lọc"'
   },
   {
@@ -132,8 +132,8 @@ const tasks = [
     functionScreen: 'Khung điều hướng chung MainScaffold & Responsive NavigationRail',
     level: 'Medium (N=3)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'NavigationBar 64dp 4 tab (Mobile) tự chuyển sang NavigationRail khi width >= 600dp'
   },
 
