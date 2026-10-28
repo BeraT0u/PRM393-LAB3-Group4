@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "420624932039",
+    "project_id": "prm393-eduplan",
+    "storage_bucket": "prm393-eduplan.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:420624932039:android:c5d0526147f341ea5132e2",
+        "android_client_info": {
+          "package_name": "com.eduplan.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "420624932039-atlobgt3ms8rdcdlgmrjtbfv93khjd6n.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.eduplan.app",
+            "certificate_hash": "fd07969108bf8efc4c40717e08f19c9746c6721a"
+          }
+        },
+        {
+          "client_id": "420624932039-d1s5sa8cnrbsm64cfh61rp85sggdq8ls.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC9xT-x8XjC50tgUQxMXeU0N3dTx0o-DXY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "420624932039-d1s5sa8cnrbsm64cfh61rp85sggdq8ls.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
