@@ -144,8 +144,8 @@ const tasks = [
     functionScreen: 'SCR-01 Màn hình Đăng nhập & State SCR-01_Loading',
     level: 'Simple (N=2)',
     responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Logo sổ tay 64dp, slogan, nút đăng nhập Google, spinner "Đang xác thực Google..."'
   },
   {

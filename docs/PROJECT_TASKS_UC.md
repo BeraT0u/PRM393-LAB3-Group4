@@ -50,7 +50,7 @@
 ### 🔷 NHÓM 2: MÀN HÌNH ĐĂNG NHẬP & TRANG CHỦ (SCR-01 & SCR-02)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-08** | SCR-01 Màn hình Đăng nhập & State SCR-01_Loading | Simple (N=2) | | | `Chưa bắt đầu` | Logo sổ tay 64dp, slogan, nút đăng nhập Google, spinner "Đang xác thực Google..." |
+| **UC-08** | SCR-01 Màn hình Đăng nhập & State SCR-01_Loading | Simple (N=2) | | 28/10/2026 | `Đã commit` | Logo sổ tay 64dp, slogan, nút đăng nhập Google, spinner "Đang xác thực Google..." |
 | **UC-09** | Xử lý xác thực Google Sign-In & Auth-state Routing (Signed in -> Home) | Medium (N=3) | | | `Chưa bắt đầu` | Bắt sự kiện hủy đăng nhập từ người dùng, dọn dẹp session khi sign-out |
 | **UC-10** | SCR-02 Home Dashboard: Lời chào, tích lũy 90/145 TC, GPA mục tiêu 3.60 | Simple (N=2) | | | `Chưa bắt đầu` | Top App Bar, Avatar sinh viên, pull-to-refresh cập nhật dữ liệu từ Firestore |
 | **UC-11** | SCR-02 Hero Card "🔥 Trọng tâm Tuần 8": Tiến độ tự học môn PRM393 (6/8h) | Simple (N=2) | | | `Chưa bắt đầu` | Thanh progress bar xanh, tag Mục tiêu Điểm A, chạm vào mở chi tiết môn SCR-05 |
