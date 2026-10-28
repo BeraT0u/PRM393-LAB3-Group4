@@ -1,3 +1,19 @@
+# 📌 QUY TRÌNH LÀM VIỆC NHÓM & QUY TẮC COMMIT TRÊN GIT (BẮT BUỘC)
+
+> Sau khi hoàn thiện chức năng UC trong link [Google Sheets Quản lý Task & Use Cases](https://docs.google.com/spreadsheets/d/1ynbjXKlnqcOq6BBKju1T5mV6T_nXMNInXkqCTdHWlQc/edit?usp=sharing) thì hãy push code lên git lên 1 nhánh mới kèm message theo rule:
+
+## Rule đặt tên commit
+
+```text
+[NgayThangNam][Ten] Chức năng
+```
+
+* **Ví dụ**: `[03/10/2026][SonNT] made UC-21 & UC-22`
+* Và sau đó merge vào nhánh `main`, phải tự chịu trách nhiệm merge và tránh conflict khi merge.
+* Sau khi đã commit và merge thành công quay lại link task và cập nhật trạng thái **đã commit** cùng với điền **tên** và **ngày hoàn thành** vào đúng UC đó.
+
+---
+
 # 🎓 EduPlan — Course Planner & Study Strategy Edition
 ### PRM393 — Lab 3: Cloud-Enabled Mobile App (Firebase, Google ARTEMIS, AI Code Review)
 

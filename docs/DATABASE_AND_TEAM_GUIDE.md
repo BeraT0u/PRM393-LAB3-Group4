@@ -4,6 +4,24 @@
 
 ---
 
+## 🚀 0. Repository Dự Án & Quy Trình Git Bắt Buộc
+
+* **GitHub Repository**: `https://github.com/BeraT0u/PRM393-LAB3-Group4.git`
+* **Clone dự án**:
+  ```bash
+  git clone https://github.com/BeraT0u/PRM393-LAB3-Group4.git
+  cd PRM393-LAB3-Group4
+  flutter pub get
+  ```
+* **Bảng phân công Task & Use Cases**: [Link Google Sheets](https://docs.google.com/spreadsheets/d/1ynbjXKlnqcOq6BBKju1T5mV6T_nXMNInXkqCTdHWlQc/edit?usp=sharing)
+* **Quy tắc làm việc**:
+  1. Nhận Use Case trên Google Sheets $\to$ Tạo branch mới để code.
+  2. Commit message theo đúng quy tắc: `[NgayThangNam][Ten] Chức năng` (Ví dụ: `[03/10/2026][SonNT] made UC-21 & UC-22`).
+  3. Merge vào nhánh `main` và chịu trách nhiệm giải quyết conflict (nếu có).
+  4. Sau khi merge thành công, cập nhật trạng thái `Đã commit`, điền tên và ngày hoàn thành lên Google Sheets.
+
+---
+
 ## 📌 1. Yêu cầu môi trường phát triển (Prerequisites)
 
 Mỗi thành viên cần cài đặt sẵn trên máy:
