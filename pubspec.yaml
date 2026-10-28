@@ -43,7 +43,7 @@ dependencies:
   firebase_analytics: ^13.0.1
   firebase_crashlytics: ^6.0.1
   firebase_remote_config: ^7.0.1
-  google_sign_in: ^7.2.0
+  google_sign_in: ^6.2.2
   google_fonts: ^9.0.0
   intl: ^0.20.3
   pdf: ^3.13.1

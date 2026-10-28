@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
+import '../services/database_seeder.dart';
 import '../utils/app_logger.dart';
 
 class FirebaseService {
@@ -15,6 +16,9 @@ class FirebaseService {
 
       // Cấu hình Remote Config mặc định
       await _initializeRemoteConfig();
+
+      // Nạp dữ liệu mẫu lên Firestore nếu đang trống
+      DatabaseSeeder.seedDatabaseIfEmpty().ignore();
     } catch (e, stack) {
       isFirebaseInitialized = false;
       AppLogger.warning('Firebase chưa thể khởi tạo (đang chạy ở chế độ Local/Fallback): $e');
