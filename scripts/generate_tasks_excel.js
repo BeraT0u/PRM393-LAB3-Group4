@@ -195,9 +195,9 @@ const tasks = [
     id: 'UC-13',
     functionScreen: 'SCR-03 Màn hình Môn Đã Học (Completed Courses) & Thẻ tiến độ 90/145 TC',
     level: 'Medium (N=3)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Card Tiến độ 90/145 TC (62%), Filter Chips theo kỳ, dòng chú thích mở khóa PRM393'
   },
   {
@@ -205,9 +205,9 @@ const tasks = [
     id: 'UC-13B',
     functionScreen: 'SCR-03 Modal Thêm môn đã học theo kỳ: Thẩm định kỳ 2 phải có kỳ 1 & Tiên quyết',
     level: 'Hard (N=5)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Nút riêng cho SV tự add môn từng kỳ, validate kỳ 2 phải có kỳ 1 và môn tiên quyết phải hoàn thành trước'
   },
   {
@@ -215,9 +215,9 @@ const tasks = [
     id: 'UC-14',
     functionScreen: 'SCR-04 Course Catalog: Danh mục môn mở, tìm kiếm & độ khó tự học',
     level: 'Medium (N=3)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Thẻ môn học, số TC, độ khó ⭐, tự học h/tuần, nút Tonal Button "Chiến lược >"'
   },
   {
@@ -225,9 +225,9 @@ const tasks = [
     id: 'UC-15',
     functionScreen: 'SCR-04 Xử lý Shimmer Skeleton khi tải & Empty State khi tìm kiếm rỗng',
     level: 'Simple (N=2)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Khi tìm từ khóa không có môn (VD: XYZ99) hiện kính lúp buồn + nút Xóa bộ lọc'
   },
   {
@@ -235,9 +235,9 @@ const tasks = [
     id: 'UC-16',
     functionScreen: 'SCR-05 Course Strategy: Header môn PRM393 & 3 badge thông số',
     level: 'Simple (N=2)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: '3 badge: 3 Tín chỉ, Độ khó 4/5 ⭐, Tiên quyết PRO192 ✅. Ẩn hoàn toàn Bottom Bar'
   },
   {
@@ -245,9 +245,9 @@ const tasks = [
     id: 'UC-17',
     functionScreen: 'SCR-05 Cấu trúc điểm 40/30/30 & Thẻ Study Tips khóa trên',
     level: 'Simple (N=2)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: '3 hộp thông số: Đồ án 40%, Lab 30%, FE 30%; Thẻ vàng nhạt tips làm Riverpod/MVVM'
   },
   {
@@ -255,9 +255,9 @@ const tasks = [
     id: 'UC-18',
     functionScreen: 'SCR-05 Radio Card chọn Mục tiêu điểm (Điểm A: 8h, B: 5h, Qua môn: 3.5h)',
     level: 'Medium (N=3)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: '3 Radio card tương tác mượt mà, tự động cập nhật số giờ tự học dự kiến'
   },
   {
@@ -265,9 +265,9 @@ const tasks = [
     id: 'UC-19',
     functionScreen: 'SCR-05 Docked Action Footer: Nút yêu thích + Nút "Thêm vào Kế hoạch"',
     level: 'Simple (N=2)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'HuyNH',
+    date: '28/10/2026',
+    status: 'Đã commit',
     note: 'Cố định chân trang, padding-bottom 110dp chống đè nội dung, điều hướng sang SCR-06A'
   },
 

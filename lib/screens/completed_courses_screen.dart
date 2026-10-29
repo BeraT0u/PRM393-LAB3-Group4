@@ -361,7 +361,7 @@ class _AddCompletedCourseSheetState extends ConsumerState<AddCompletedCourseShee
             ),
             const SizedBox(height: AppSpacing.lg),
             DropdownButtonFormField<int>(
-              initialValue: _semester,
+              value: _semester,
               decoration: const InputDecoration(labelText: 'Kỳ học'),
               items: [
                 for (var s = CompletedCourseRules.minSemester;
@@ -376,7 +376,7 @@ class _AddCompletedCourseSheetState extends ConsumerState<AddCompletedCourseShee
             ),
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<CourseModel>(
-              initialValue: _course,
+              value: addable.contains(_course) ? _course : null,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Môn học'),
               items: [

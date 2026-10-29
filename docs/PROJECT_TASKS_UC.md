@@ -61,14 +61,14 @@
 ### 🔷 NHÓM 3: TIẾN ĐỘ TÍCH LŨY & DANH MỤC MÔN HỌC (SCR-03, 04, 05)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-13** | SCR-03 Màn hình Môn Đã Học (Completed Courses) & Thẻ tiến độ 90/145 TC | Medium (N=3) | | | `Chưa bắt đầu` | Card Tiến độ 90/145 TC (62%), Filter Chips theo kỳ, dòng chú thích mở khóa PRM393 |
-| **UC-13B**| SCR-03 Modal Thêm môn đã học theo kỳ: Thẩm định kỳ 2 phải có kỳ 1 & Tiên quyết | Hard (N=5) | | | `Chưa bắt đầu` | Nút riêng cho SV tự add môn từng kỳ, validate kỳ 2 phải có kỳ 1 và môn tiên quyết phải hoàn thành trước |
-| **UC-14** | SCR-04 Course Catalog: Danh mục môn mở, tìm kiếm & độ khó tự học | Medium (N=3) | | | `Chưa bắt đầu` | Thẻ môn học, số TC, độ khó ⭐, tự học h/tuần, nút Tonal Button "Chiến lược >" |
-| **UC-15** | SCR-04 Xử lý Shimmer Skeleton khi tải & Empty State khi tìm kiếm rỗng | Simple (N=2) | | | `Chưa bắt đầu` | Khi tìm từ khóa không có môn (VD: XYZ99) hiện kính lúp buồn + nút Xóa bộ lọc |
-| **UC-16** | SCR-05 Course Strategy: Header môn PRM393 & 3 badge thông số | Simple (N=2) | | | `Chưa bắt đầu` | 3 badge: 3 Tín chỉ, Độ khó 4/5 ⭐, Tiên quyết PRO192 ✅. Ẩn hoàn toàn Bottom Bar |
-| **UC-17** | SCR-05 Cấu trúc điểm 40/30/30 & Thẻ Study Tips khóa trên | Simple (N=2) | | | `Chưa bắt đầu` | 3 hộp thông số: Đồ án 40%, Lab 30%, FE 30%; Thẻ vàng nhạt tips làm Riverpod/MVVM |
-| **UC-18** | SCR-05 Radio Card chọn Mục tiêu điểm (Điểm A: 8h, B: 5h, Qua môn: 3.5h) | Medium (N=3) | | | `Chưa bắt đầu` | 3 Radio card tương tác mượt mà, tự động cập nhật số giờ tự học dự kiến |
-| **UC-19** | SCR-05 Docked Action Footer: Nút yêu thích + Nút "Thêm vào Kế hoạch" | Simple (N=2) | | | `Chưa bắt đầu` | Cố định chân trang, padding-bottom 110dp chống đè nội dung, điều hướng sang SCR-06A |
+| **UC-13** | SCR-03 Màn hình Môn Đã Học (Completed Courses) & Thẻ tiến độ 90/145 TC | Medium (N=3) | HuyNH | 28/10/2026 | `Đã commit` | Card Tiến độ 90/145 TC (62%), Filter Chips theo kỳ, dòng chú thích mở khóa PRM393 |
+| **UC-13B**| SCR-03 Modal Thêm môn đã học theo kỳ: Thẩm định kỳ 2 phải có kỳ 1 & Tiên quyết | Hard (N=5) | HuyNH | 28/10/2026 | `Đã commit` | Nút riêng cho SV tự add môn từng kỳ, validate kỳ 2 phải có kỳ 1 và môn tiên quyết phải hoàn thành trước |
+| **UC-14** | SCR-04 Course Catalog: Danh mục môn mở, tìm kiếm & độ khó tự học | Medium (N=3) | HuyNH | 28/10/2026 | `Đã commit` | Thẻ môn học, số TC, độ khó ⭐, tự học h/tuần, nút Tonal Button "Chiến lược >" |
+| **UC-15** | SCR-04 Xử lý Shimmer Skeleton khi tải & Empty State khi tìm kiếm rỗng | Simple (N=2) | HuyNH | 28/10/2026 | `Đã commit` | Khi tìm từ khóa không có môn (VD: XYZ99) hiện kính lúp buồn + nút Xóa bộ lọc |
+| **UC-16** | SCR-05 Course Strategy: Header môn PRM393 & 3 badge thông số | Simple (N=2) | HuyNH | 28/10/2026 | `Đã commit` | 3 badge: 3 Tín chỉ, Độ khó 4/5 ⭐, Tiên quyết PRO192 ✅. Ẩn hoàn toàn Bottom Bar |
+| **UC-17** | SCR-05 Cấu trúc điểm 40/30/30 & Thẻ Study Tips khóa trên | Simple (N=2) | HuyNH | 28/10/2026 | `Đã commit` | 3 hộp thông số: Đồ án 40%, Lab 30%, FE 30%; Thẻ vàng nhạt tips làm Riverpod/MVVM |
+| **UC-18** | SCR-05 Radio Card chọn Mục tiêu điểm (Điểm A: 8h, B: 5h, Qua môn: 3.5h) | Medium (N=3) | HuyNH | 28/10/2026 | `Đã commit` | 3 Radio card tương tác mượt mà, tự động cập nhật số giờ tự học dự kiến |
+| **UC-19** | SCR-05 Docked Action Footer: Nút yêu thích + Nút "Thêm vào Kế hoạch" | Simple (N=2) | HuyNH | 28/10/2026 | `Đã commit` | Cố định chân trang, padding-bottom 110dp chống đè nội dung, điều hướng sang SCR-06A |
 
 ---
 
