@@ -69,23 +69,30 @@ class AppFilterChips extends StatelessWidget {
   final List<String> categories;
   final String selectedCategory;
   final ValueChanged<String> onSelected;
+  final Widget? trailingChip;
 
   const AppFilterChips({
     super.key,
     required this.categories,
     required this.selectedCategory,
     required this.onSelected,
+    this.trailingChip,
   });
 
   @override
   Widget build(BuildContext context) {
+    final int count = categories.length + (trailingChip != null ? 1 : 0);
+
     return SizedBox(
       height: AppSpacing.minTouchTarget,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
+        itemCount: count,
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sm),
         itemBuilder: (context, index) {
+          if (trailingChip != null && index == categories.length) {
+            return Center(child: trailingChip!);
+          }
           final category = categories[index];
           final isSelected = category == selectedCategory;
 

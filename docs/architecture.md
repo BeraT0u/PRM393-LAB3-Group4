@@ -186,3 +186,21 @@ sequenceDiagram
   - Ảnh đại diện (`avatarUrl` hoặc đồng bộ ảnh Google)
   - GPA mục tiêu (`targetGpa`) và Tổng tín chỉ tốt nghiệp (`totalGraduationCredits`)
 - Cập nhật trực tiếp lên Firestore `students/{uid}` và đồng bộ ngay lên toàn bộ ứng dụng.
+
+### 5.5. Kiến trúc Lập Kế Hoạch Vận Hành Thực Tế & Lưu Trữ Cục Bộ (Real-World Dynamic Planning & Local-First Persistence)
+- **Tư duy thiết kế**: Ứng dụng phải hoạt động như một ứng dụng thực tế lâu dài cho người dùng cuối, loại bỏ sự phụ thuộc vào dữ liệu mẫu giả định cố định (static demo script).
+- **Trạng thái khởi tạo linh hoạt (Zero-Course Start)**:
+  - Cho phép kế hoạch bắt đầu từ trạng thái rỗng (`0 môn học`).
+  - Khi chưa có môn nào: Màn hình Phân tích kế hoạch (`SCR-06A`) hiển thị Empty State thân thiện ("Chưa có môn nào trong kế hoạch kỳ này") cùng nút chuyển nhanh sang Course Catalog (`SCR-04`) để bắt đầu thêm môn.
+- **Quy trình Thêm môn động & Nút `[+ Thêm môn]` trên SCR-06A**:
+  - Sinh viên duyệt danh mục môn (`SCR-04`), xem cấu trúc & mẹo học tập (`SCR-05`), chọn mục tiêu điểm (A / B / PASS) và nhấn "Thêm vào Kế hoạch".
+  - Tại `SCR-06A`, **nếu kế hoạch hợp lệ / không báo đỏ xung đột / chưa vượt ngưỡng quá tải**: Hệ thống hiển thị nút hành động **`[+ Thêm môn]`** ở góc trên bên phải AppBar để sinh viên tiếp tục chọn thêm các môn khác vào kỳ học.
+  - Khi tiếp tục thêm môn, hệ thống liên tục tính toán lại tổng giờ tự học và đối chiếu cây môn tiên quyết cho đến khi vượt ngưỡng (báo đỏ) hoặc đạt kỳ vọng của sinh viên.
+- **Lưu trữ Cục bộ (Local Persistence First)**:
+  - Toàn bộ danh sách môn đã chọn trong kế hoạch đang lập dở phải được lưu trữ ở local (Riverpod persistent state kết hợp SharedPreferences / Local cache).
+  - Khi người dùng điều hướng qua lại giữa các tab (Trang chủ, Đã học, Tìm môn, Cá nhân) hay tạm thời thoát ứng dụng, dữ liệu môn đã chọn vẫn được bảo toàn nguyên vẹn, không bị reset về danh sách mẫu.
+- **Đồng bộ Lên Cloud Firestore (Cloud Sync on Resolution)**:
+  - Chỉ khi kế hoạch đạt điều kiện an toàn (0 xung đột, hoặc sau khi người dùng đã giải quyết xong xung đột ở `SCR-06B`), nút "Lưu Kế Hoạch Học Tập" (Active màu xanh) mới kích hoạt ghi dữ liệu chính thức lên Cloud Firestore (`study_plans/{planId}`).
+- **Nguyên lý Mở rộng Toàn Ứng Dụng (End-to-End Real App Experience)**:
+  - Mọi chức năng khác đều vận hành dựa trên dữ liệu thật và quy tắc nghiệp vụ động (Dynamic rules): Tài khoản mới đăng nhập có luồng setup thông tin ban đầu, màn hình Môn đã học có luồng tự khai báo môn từng kỳ kèm validation tiên quyết chuẩn, màn hình Tổng kết kỳ tự động cập nhật tích lũy tín chỉ thật.
+

@@ -57,22 +57,15 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             const SizedBox(width: AppSpacing.xs),
           ] else if (showLogo) ...[
-            Container(
+            Image.asset(
+              'assets/images/logo.png',
               width: 38,
               height: 38,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceCard,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.borderStructural),
-              ),
-              padding: const EdgeInsets.all(6),
-              child: Image.asset(
-                'assets/images/logo.png',
-                errorBuilder: (_, _, _) => const Icon(
-                  Icons.menu_book_rounded,
-                  color: AppColors.primaryBlue,
-                  size: 20,
-                ),
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.menu_book_rounded,
+                color: AppColors.primaryBlue,
+                size: 32,
               ),
             ),
             const SizedBox(width: AppSpacing.md),
@@ -200,8 +193,8 @@ class MainScaffold extends StatelessWidget {
                       label: Text('Trang chủ'),
                     ),
                     NavigationRailDestination(
-                      icon: Icon(Icons.calendar_today_outlined),
-                      selectedIcon: Icon(Icons.calendar_month_rounded),
+                      icon: Icon(Icons.fact_check_outlined),
+                      selectedIcon: Icon(Icons.fact_check_rounded),
                       label: Text('Đã học'),
                     ),
                     NavigationRailDestination(
@@ -272,8 +265,8 @@ class MainScaffold extends StatelessWidget {
                         label: 'Trang chủ',
                       ),
                       NavigationDestination(
-                        icon: Icon(Icons.calendar_today_outlined),
-                        selectedIcon: Icon(Icons.calendar_month_rounded),
+                        icon: Icon(Icons.fact_check_outlined),
+                        selectedIcon: Icon(Icons.fact_check_rounded),
                         label: 'Đã học',
                       ),
                       NavigationDestination(
