@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../utils/app_logger.dart';
 
@@ -17,10 +18,11 @@ class UploadProgressInfo {
 }
 
 class StorageService {
-  final FirebaseStorage _storage;
+  final FirebaseStorage? _storage;
 
   StorageService({FirebaseStorage? storage})
-      : _storage = storage ?? FirebaseStorage.instance;
+      : _storage = storage ??
+            (Firebase.apps.isNotEmpty ? FirebaseStorage.instance : null);
 
   /// Tải file PDF bản vẽ kế hoạch lên Firebase Cloud Storage
   /// Đường dẫn cô lập theo từng user: reports/{userId}/{fileName}
@@ -31,9 +33,19 @@ class StorageService {
   }) async* {
     yield const UploadProgressInfo(progress: 0.05);
 
+    final safeFileName = fileName.endsWith('.pdf') ? fileName : '$fileName.pdf';
+    final storage = _storage;
+    if (storage == null) {
+      yield UploadProgressInfo(
+        progress: 1.0,
+        isCompleted: true,
+        downloadUrl: 'https://storage.mock.local/$safeFileName',
+      );
+      return;
+    }
+
     try {
-      final safeFileName = fileName.endsWith('.pdf') ? fileName : '$fileName.pdf';
-      final storageRef = _storage.ref().child('reports/$userId/$safeFileName');
+      final storageRef = storage.ref().child('reports/$userId/$safeFileName');
 
       final metadata = SettableMetadata(
         contentType: 'application/pdf',

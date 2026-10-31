@@ -1,21 +1,28 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../utils/app_logger.dart';
 
 class AuthService {
-  final FirebaseAuth _auth;
+  final FirebaseAuth? _auth;
   final GoogleSignIn _googleSignIn;
 
   AuthService({FirebaseAuth? auth, GoogleSignIn? googleSignIn})
-      : _auth = auth ?? FirebaseAuth.instance,
+      : _auth = auth ?? (Firebase.apps.isNotEmpty ? FirebaseAuth.instance : null),
         _googleSignIn = googleSignIn ?? GoogleSignIn();
 
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<User?> get authStateChanges =>
+      _auth?.authStateChanges() ?? const Stream.empty();
 
-  User? get currentUser => _auth.currentUser;
+  User? get currentUser => _auth?.currentUser;
 
   /// Đăng nhập bằng Google Account
   Future<UserCredential?> signInWithGoogle() async {
+    final auth = _auth;
+    if (auth == null) {
+      AppLogger.warning('FirebaseAuth chưa được khởi tạo.');
+      return null;
+    }
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -29,7 +36,7 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
+      final userCredential = await auth.signInWithCredential(credential);
       AppLogger.info('Đăng nhập Google thành công: ${userCredential.user?.email}');
       return userCredential;
     } catch (e, st) {
@@ -43,7 +50,7 @@ class AuthService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
-      await _auth.signOut();
+      await _auth?.signOut();
       AppLogger.info('Đã đăng xuất tài khoản thành công.');
     } catch (e) {
       AppLogger.warning('Lỗi khi đăng xuất: $e');

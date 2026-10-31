@@ -302,8 +302,12 @@ User Interactions: Bấm chọn radio mục tiêu điểm; bấm nút "Thêm và
 Navigation: Bấm nút chính ➔ Navigator.pushNamed('/plan-analyzer') sang SCR-06A. Nút Back [←] ➔ Quay lại SCR-04.
 Important UI Constraints: Padding đáy 110dp đảm bảo nội dung cuộn lên hết, không bị nút chân trang đè.
 3.6. SCR-06A — Workload & Strategy Analyzer (Phân Tích Kế Hoạch)
-Layout: Scaffold → AppBar("Phân Tích Kế Hoạch", Back [←]) → SingleChildScrollView(padding: EdgeInsets.only(bottom: 110)) → DockedBottomButton(cố định đáy).
+Layout: Scaffold → AppBar("Phân Tích Kế Hoạch", Back [←], Actions: [+ Thêm môn] khi không có lỗi) → SingleChildScrollView(padding: EdgeInsets.only(bottom: 110)) → DockedBottomButton(cố định đáy).
 Quy tắc điều hướng: ẨN HOÀN TOÀN Bottom Navigation Bar.
+Yêu cầu vận hành thực tế (Production-Ready Architecture):
+- Bắt đầu linh hoạt (Zero-Course Start): Có thể bắt đầu từ trạng thái rỗng (0 môn được chọn) thay vì chỉ gán cố định data mẫu. Khi rỗng, hiển thị Empty State kèm nút dẫn sang Course Catalog.
+- Nút [+ Thêm môn] trên AppBar: Nếu kế hoạch hợp lệ / không có xung đột / chưa vượt ngưỡng an toàn (không báo đỏ), hiển thị nút TextButton hoặc IconButton `[+ Thêm môn]` ở góc trên bên phải AppBar để sinh viên tiếp tục chọn thêm môn vào kỳ này.
+- Lưu trữ cục bộ (Local Persistence): Các môn đã chọn được lưu ở bộ nhớ máy/cache cục bộ (Riverpod state + SharedPreferences), đảm bảo sinh viên đi qua lại giữa các tab (Trang chủ, Đã học, Tìm môn, Cá nhân) dữ liệu chọn môn không bị mất hay reset.
 Components & Báo động lỗi:
 Banner Báo động đỏ (Top): Nền #FEE2E2, viền #DC2626, icon ⚠️, text: "⚠️ Cảnh báo: Vi phạm tiên quyết & Quá tải!".
 Thẻ Đo lường Khối lượng (Workload Meter): "Tổng giờ tự học: 34 giờ / tuần", phụ đề "Vượt ngưỡng an toàn (Khuyến nghị: 25h/tuần)", thanh progress bar có đoạn đỏ quá tải.
@@ -311,13 +315,16 @@ Danh sách phân bổ môn (4 thẻ):
 3 thẻ môn bình thường: PRM393 (8h/tuần), SWE302 (7h/tuần), AIE411 (7h/tuần).
 1 thẻ XUNG ĐỘT ĐỎ (IAE201): Nền #FEE2E2, viền đỏ 1.5px #DC2626, tiêu đề "⚠️ IAE201 (An toàn TT)", phụ đề "Tự học: +12h/tuần • LỖI: Chưa học tiên quyết NWC203".
 Sticky Footer Button: Nút lớn "Điều chỉnh kế hoạch (4 môn) ➔" (Cao 52dp, nền #2563EB).
-States: Thể hiện trực quan trạng thái hệ thống phát hiện lỗi (Error Detection State).
+States: Thể hiện trực quan trạng thái hệ thống phát hiện lỗi (Error Detection State) và trạng thái kế hoạch hợp lệ / rỗng.
 User Interactions: Chạm vào thẻ lỗi hoặc chạm nút chân trang ➔ Mở SCR-06B.
-Navigation: Nút chân trang dẫn sang SCR-06B; Nút Back [←] quay lại SCR-05.
+Navigation: Nút chân trang dẫn sang SCR-06B; Nút Back [←] quay lại SCR-05; Nút [+ Thêm môn] dẫn sang SCR-04.
 Important UI Constraints: Ô báo động đỏ sử dụng cả màu sắc, viền, icon ⚠️ và chữ đậm để truyền đạt lỗi theo chuẩn WCAG 1.4.1.
 3.7. SCR-06B — Selected Courses & SCR-06B_Resolved
 Layout: Scaffold → AppBar("Môn Đã Chọn", Back [←]) → ListView(padding: EdgeInsets.only(bottom: 110)) → DockedBottomButton.
 Quy tắc điều hướng: ẨN HOÀN TOÀN Bottom Navigation Bar.
+Lưu trữ & Đồng bộ Cloud (Cloud Sync & Local Persistence):
+- Dữ liệu môn được bảo toàn ở local xuyên suốt quá trình hoán đổi/thay thế môn.
+- Chỉ khi kế hoạch đã giải quyết xong xung đột (hoặc hoàn toàn hợp lệ), nút "Lưu Kế Hoạch Học Tập" (Active màu xanh) mới ghi dữ liệu chính thức lên Cloud Firestore (`study_plans`).
 Components & 2 Trạng thái phục hồi lỗi (Error Recovery):
 Trạng thái 1: SCR-06B_Selected_Courses (Khi còn lỗi):
 Thẻ Tổng quan: "4 Môn • 12 Tín chỉ • Tổng khối lượng: 34h/tuần" + Hộp cảnh báo "⚠️ 1 môn vi phạm tiên quyết".

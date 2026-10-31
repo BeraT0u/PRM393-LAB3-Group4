@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../models/completed_course_model.dart';
 import '../models/course_model.dart';
 import '../models/student_profile_model.dart';
@@ -6,13 +7,14 @@ import '../utils/app_logger.dart';
 import 'database_seeder.dart';
 
 class StudentService {
-  final FirebaseFirestore _firestore;
+  final FirebaseFirestore? _firestore;
 
   StudentService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+      : _firestore = firestore ??
+            (Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null);
 
-  CollectionReference<Map<String, dynamic>> get _studentsRef =>
-      _firestore.collection('students');
+  CollectionReference<Map<String, dynamic>>? get _studentsRef =>
+      _firestore?.collection('students');
 
   /// Lấy hồ sơ sinh viên từ Firestore theo UID, hỗ trợ đa Persona hoặc khởi tạo hồ sơ rỗng
   Future<StudentProfileModel> getStudentProfile(
@@ -21,8 +23,17 @@ class StudentService {
     String? displayName,
     String? photoUrl,
   }) async {
+    final ref = _studentsRef;
+    if (ref == null) {
+      return DatabaseSeeder.resolveProfileForUser(
+        uid: uid,
+        email: email,
+        displayName: displayName,
+        photoUrl: photoUrl,
+      );
+    }
     try {
-      final doc = await _studentsRef.doc(uid).get();
+      final doc = await ref.doc(uid).get();
       if (doc.exists && doc.data() != null) {
         return StudentProfileModel.fromMap(doc.data()!, doc.id);
       }
@@ -35,7 +46,7 @@ class StudentService {
         photoUrl: photoUrl,
       );
 
-      await _studentsRef.doc(uid).set(profile.toMap());
+      await ref.doc(uid).set(profile.toMap());
       AppLogger.info('Đã tạo hồ sơ cho người dùng $uid (isNew=${profile.isNewStudent})');
       return profile;
     } catch (e) {
@@ -57,6 +68,8 @@ class StudentService {
     String? avatarUrl,
     double? targetGpa,
   }) async {
+    final ref = _studentsRef;
+    if (ref == null) return;
     try {
       final updates = <String, dynamic>{
         'fullName': fullName,
@@ -66,7 +79,7 @@ class StudentService {
       if (avatarUrl != null) updates['avatarUrl'] = avatarUrl;
       if (targetGpa != null) updates['targetGpa'] = targetGpa;
 
-      await _studentsRef.doc(uid).set(updates, SetOptions(merge: true));
+      await ref.doc(uid).set(updates, SetOptions(merge: true));
       AppLogger.info('Đã cập nhật thông tin cá nhân cho $studentId ($fullName)');
     } catch (e, st) {
       AppLogger.error('Lỗi khi cập nhật thông tin cá nhân', e, st);
@@ -76,9 +89,11 @@ class StudentService {
 
   /// Lấy danh sách môn đã học của sinh viên (SCR-03)
   Future<List<CompletedCourseModel>> getCompletedCourses(String uid) async {
+    final ref = _studentsRef;
+    if (ref == null) return [];
     try {
       final snapshot =
-          await _studentsRef.doc(uid).collection('completed_courses').get();
+          await ref.doc(uid).collection('completed_courses').get();
       return snapshot.docs
           .map((d) => CompletedCourseModel.fromMap(d.data(), d.id))
           .toList();
@@ -102,15 +117,18 @@ class StudentService {
 
     // 1. Kiểm tra ràng buộc tiến trình kỳ học ("kì 2 phải có kì 1")
     if (semesterIndex > 1) {
-      // Đếm số môn đã có ở các kỳ trước
-      final prevSemestersSnapshot = await _studentsRef
-          .doc(uid)
-          .collection('completed_courses')
-          .where('semesterIndex', isLessThan: semesterIndex)
-          .limit(1)
-          .get();
-
-      final hasPreviousCourses = prevSemestersSnapshot.docs.isNotEmpty ||
+      final ref = _studentsRef;
+      bool hasPreviousCourses = false;
+      if (ref != null) {
+        final prevSemestersSnapshot = await ref
+            .doc(uid)
+            .collection('completed_courses')
+            .where('semesterIndex', isLessThan: semesterIndex)
+            .limit(1)
+            .get();
+        hasPreviousCourses = prevSemestersSnapshot.docs.isNotEmpty;
+      }
+      hasPreviousCourses = hasPreviousCourses ||
           (profile.passedCourseCodes.isNotEmpty && semesterIndex <= 4);
 
       if (!hasPreviousCourses) {
@@ -133,32 +151,35 @@ class StudentService {
     }
 
     // 3. Ghi vào subcollection completed_courses
-    final courseDoc = _studentsRef
-        .doc(uid)
-        .collection('completed_courses')
-        .doc(course.code);
+    final ref = _studentsRef;
+    if (ref != null) {
+      final courseDoc = ref
+          .doc(uid)
+          .collection('completed_courses')
+          .doc(course.code);
 
-    final courseData = {
-      'courseId': course.id,
-      'code': course.code,
-      'name': course.name,
-      'credits': course.credits,
-      'grade': grade,
-      'gradeLetter': grade >= 8.5 ? 'A' : (grade >= 7.0 ? 'B' : 'C'),
-      'semesterIndex': semesterIndex,
-      'completedAt': FieldValue.serverTimestamp(),
-    };
+      final courseData = {
+        'courseId': course.id,
+        'code': course.code,
+        'name': course.name,
+        'credits': course.credits,
+        'grade': grade,
+        'gradeLetter': grade >= 8.5 ? 'A' : (grade >= 7.0 ? 'B' : 'C'),
+        'semesterIndex': semesterIndex,
+        'completedAt': FieldValue.serverTimestamp(),
+      };
 
-    await courseDoc.set(courseData);
+      await courseDoc.set(courseData);
 
-    // 4. Cập nhật hồ sơ sinh viên: tăng tín chỉ tích lũy & thêm mã môn đã Pass
-    final updatedPassedCodes = Set<String>.from(profile.passedCourseCodes)..add(course.code);
-    final updatedCredits = profile.accumulatedCredits + course.credits;
+      // 4. Cập nhật hồ sơ sinh viên: tăng tín chỉ tích lũy & thêm mã môn đã Pass
+      final updatedPassedCodes = Set<String>.from(profile.passedCourseCodes)..add(course.code);
+      final updatedCredits = profile.accumulatedCredits + course.credits;
 
-    await _studentsRef.doc(uid).set({
-      'passedCourseCodes': updatedPassedCodes.toList(),
-      'accumulatedCredits': updatedCredits,
-    }, SetOptions(merge: true));
+      await ref.doc(uid).set({
+        'passedCourseCodes': updatedPassedCodes.toList(),
+        'accumulatedCredits': updatedCredits,
+      }, SetOptions(merge: true));
+    }
 
     AppLogger.info('Đã thêm môn ${course.code} vào Kỳ $semesterIndex cho $uid (+${course.credits} TC)');
   }
@@ -169,8 +190,11 @@ class StudentService {
     required String uid,
     required String planId,
   }) async {
+    final firestore = _firestore;
+    final ref = _studentsRef;
+    if (firestore == null || ref == null) return;
     try {
-      final planDoc = await _firestore.collection('study_plans').doc(planId).get();
+      final planDoc = await firestore.collection('study_plans').doc(planId).get();
       if (!planDoc.exists || planDoc.data() == null) {
         throw StateError('Không tìm thấy bản kế hoạch $planId để nghiệm thu.');
       }
@@ -179,7 +203,7 @@ class StudentService {
       final coursesList = (planData['selectedCourses'] as List<dynamic>?) ?? [];
       final profile = await getStudentProfile(uid);
 
-      final batch = _firestore.batch();
+      final batch = firestore.batch();
       final newPassedCodes = Set<String>.from(profile.passedCourseCodes);
       int addedCredits = 0;
 
@@ -188,7 +212,7 @@ class StudentService {
         final courseId = (courseMap['id'] ?? courseMap['code'] ?? '') as String;
         final course = CourseModel.fromMap(courseMap, courseId);
 
-        final completedRef = _studentsRef
+        final completedRef = ref
             .doc(uid)
             .collection('completed_courses')
             .doc(course.code);
@@ -209,7 +233,7 @@ class StudentService {
       }
 
       // Cập nhật lại tín chỉ sinh viên
-      batch.set(_studentsRef.doc(uid), {
+      batch.set(ref.doc(uid), {
         'accumulatedCredits': profile.accumulatedCredits + addedCredits,
         'passedCourseCodes': newPassedCodes.toList(),
       }, SetOptions(merge: true));
@@ -231,8 +255,10 @@ class StudentService {
 
   /// Cập nhật toàn bộ thông tin hồ sơ sinh viên
   Future<void> updateProfile(StudentProfileModel profile) async {
+    final ref = _studentsRef;
+    if (ref == null) return;
     try {
-      await _studentsRef.doc(profile.uid).set(profile.toMap(), SetOptions(merge: true));
+      await ref.doc(profile.uid).set(profile.toMap(), SetOptions(merge: true));
       AppLogger.info('Đã cập nhật hồ sơ sinh viên ${profile.studentId} lên Firestore');
     } catch (e, st) {
       AppLogger.error('Lỗi khi cập nhật hồ sơ sinh viên', e, st);
@@ -246,13 +272,15 @@ class StudentService {
     bool? autoWarnWorkload,
     bool? syncGoogleCalendar,
   }) async {
+    final ref = _studentsRef;
+    if (ref == null) return;
     try {
       final updates = <String, dynamic>{};
       if (notifyLabDeadlines != null) updates['notifyLabDeadlines'] = notifyLabDeadlines;
       if (autoWarnWorkload != null) updates['autoWarnWorkload'] = autoWarnWorkload;
       if (syncGoogleCalendar != null) updates['syncGoogleCalendar'] = syncGoogleCalendar;
 
-      await _studentsRef.doc(uid).update(updates);
+      await ref.doc(uid).update(updates);
       AppLogger.info('Đã lưu cài đặt thông báo cho $uid');
     } catch (e) {
       AppLogger.warning('Lỗi khi lưu cài đặt: $e');

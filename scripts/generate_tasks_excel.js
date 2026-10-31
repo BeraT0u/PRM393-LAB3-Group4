@@ -277,9 +277,9 @@ const tasks = [
     id: 'UC-20',
     functionScreen: 'SCR-06A Workload Analyzer: Banner cảnh báo đỏ quá tải & vi phạm',
     level: 'Simple (N=2)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'TrongHieu',
+    date: '30/10/2026',
+    status: 'Đã commit',
     note: 'Nền đỏ #FEE2E2, viền #DC2626, icon ⚠️ "Cảnh báo: Vi phạm tiên quyết & Quá tải!"'
   },
   {
@@ -287,9 +287,9 @@ const tasks = [
     id: 'UC-21',
     functionScreen: 'SCR-06A Thẻ Workload Meter: 34h/tuần vượt ngưỡng an toàn (25h Remote Config)',
     level: 'Medium (N=3)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'TrongHieu',
+    date: '30/10/2026',
+    status: 'Đã commit',
     note: 'Thanh progress bar có đoạn màu đỏ báo quá tải, lấy max_safe_workload_hours động'
   },
   {
@@ -297,9 +297,9 @@ const tasks = [
     id: 'UC-22',
     functionScreen: 'SCR-06A Danh sách 4 thẻ môn: 3 môn hợp lệ và 1 môn vi phạm đỏ IAE201',
     level: 'Medium (N=3)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'TrongHieu',
+    date: '30/10/2026',
+    status: 'Đã commit',
     note: 'PRM393 (8h), SWE302 (7h), AIE411 (7h); IAE201 (+12h, LỖI chưa học tiên quyết NWC203)'
   },
   {
@@ -307,9 +307,9 @@ const tasks = [
     id: 'UC-23',
     functionScreen: 'SCR-06B Selected Courses (State lỗi): Nút Lưu BỊ KHÓA & Nút [⇄ Đổi môn]',
     level: 'Hard (N=5)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'TrongHieu',
+    date: '30/10/2026',
+    status: 'Đã commit',
     note: 'Nút chân trang màu xám "🔒 Giải quyết 1 xung đột để lưu"; nút Đổi môn mở SCR-05'
   },
   {
@@ -317,9 +317,9 @@ const tasks = [
     id: 'UC-24',
     functionScreen: 'SCR-06B_Resolved Khắc phục xung đột: Đổi sang PRM323, tải 26h Cân bằng',
     level: 'Hard (N=5)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'TrongHieu',
+    date: '30/10/2026',
+    status: 'Đã commit',
     note: 'Môn thứ 4 đổi thành PRM323 (4h), tổng 26h; NÚT LƯU MỞ KHÓA MÀU XANH ACTIVE'
   },
   {
@@ -327,9 +327,9 @@ const tasks = [
     id: 'UC-25',
     functionScreen: 'Lưu Kế hoạch học tập vào Firestore & Chuyển hướng sang SCR-07',
     level: 'Medium (N=3)',
-    responsible: '',
-    date: '',
-    status: 'Chưa bắt đầu',
+    responsible: 'TrongHieu',
+    date: '30/10/2026',
+    status: 'Đã commit',
     note: 'Ghi dữ liệu kế hoạch hợp lệ vào study_plans trên Cloud Firestore, pushNamed sang SCR-07'
   },
 

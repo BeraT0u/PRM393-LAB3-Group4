@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
+import '../widgets/main_scaffold.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -10,14 +11,36 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.canvasBg,
+    return MainScaffold(
+      currentTabIndex: 0,
       appBar: AppBar(
-        title: const Row(
+        backgroundColor: AppColors.canvasBg,
+        surfaceTintColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        toolbarHeight: 64.0,
+        titleSpacing: AppSpacing.lg,
+        title: Row(
           children: [
-            Icon(Icons.menu_book_rounded, color: AppColors.primaryBlue, size: 24),
-            SizedBox(width: AppSpacing.sm),
-            Text('EduPlan'),
+            Image.asset(
+              'assets/images/logo.png',
+              width: 38,
+              height: 38,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(
+                Icons.menu_book_rounded,
+                color: AppColors.primaryBlue,
+                size: 32,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Text(
+              'EduPlan',
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -46,15 +69,17 @@ class HomeScreen extends ConsumerWidget {
                   child: Text('HL', style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(width: AppSpacing.md),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Chào Hoàng Long 👋', style: theme.textTheme.titleMedium),
-                    Text(
-                      'Tích lũy: 90/145 TC • GPA mục tiêu: 3.60',
-                      style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
-                    ),
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Chào Hoàng Long 👋', style: theme.textTheme.titleMedium),
+                      Text(
+                        'Tích lũy: 90/145 TC • GPA mục tiêu: 3.60',
+                        style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -145,15 +170,6 @@ class HomeScreen extends ConsumerWidget {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: 0,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Trang chủ'),
-          NavigationDestination(icon: Icon(Icons.fact_check_outlined), selectedIcon: Icon(Icons.fact_check), label: 'Đã học'),
-          NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Tìm môn'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Cá nhân'),
-        ],
       ),
     );
   }

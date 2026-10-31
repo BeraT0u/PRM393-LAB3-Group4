@@ -75,12 +75,13 @@
 ### 🔷 NHÓM 4: PHÂN TÍCH QUÁ TẢI & KHẮC PHỤC XUNG ĐỘT (SCR-06A & 06B)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-20** | SCR-06A Workload Analyzer: Banner cảnh báo đỏ quá tải & vi phạm | Simple (N=2) | | | `Chưa bắt đầu` | Nền đỏ #FEE2E2, viền #DC2626, icon ⚠️ "Cảnh báo: Vi phạm tiên quyết & Quá tải!" |
-| **UC-21** | SCR-06A Thẻ Workload Meter: 34h/tuần vượt ngưỡng an toàn (25h Remote Config) | Medium (N=3) | | | `Chưa bắt đầu` | Thanh progress bar có đoạn màu đỏ báo quá tải, lấy max_safe_workload_hours động |
-| **UC-22** | SCR-06A Danh sách 4 thẻ môn: 3 môn hợp lệ và 1 môn vi phạm đỏ IAE201 | Medium (N=3) | | | `Chưa bắt đầu` | PRM393 (8h), SWE302 (7h), AIE411 (7h); IAE201 (+12h, LỖI chưa học tiên quyết NWC203) |
-| **UC-23** | SCR-06B Selected Courses (State lỗi): Nút Lưu BỊ KHÓA & Nút [⇄ Đổi môn] | Hard (N=5) | | | `Chưa bắt đầu` | Nút chân trang màu xám "🔒 Giải quyết 1 xung đột để lưu"; nút Đổi môn mở SCR-05 |
-| **UC-24** | SCR-06B_Resolved Khắc phục xung đột: Đổi sang PRM323, tải 26h Cân bằng | Hard (N=5) | | | `Chưa bắt đầu` | Môn thứ 4 đổi thành PRM323 (4h), tổng 26h; NÚT LƯU MỞ KHÓA MÀU XANH ACTIVE |
-| **UC-25** | Lưu Kế hoạch học tập vào Firestore & Chuyển hướng sang SCR-07 | Medium (N=3) | | | `Chưa bắt đầu` | Ghi dữ liệu kế hoạch hợp lệ vào study_plans trên Cloud Firestore, pushNamed sang SCR-07 |
+| **UC-20** | SCR-06A Workload Analyzer: Banner cảnh báo đỏ quá tải & vi phạm | Simple (N=2) | TrongHieu | 30/10/2026 | `Đã commit` | Nền đỏ #FEE2E2, viền #DC2626, icon ⚠️ "Cảnh báo: Vi phạm tiên quyết & Quá tải!" |
+| **UC-21** | SCR-06A Thẻ Workload Meter: 34h/tuần vượt ngưỡng an toàn (25h Remote Config) | Medium (N=3) | TrongHieu | 30/10/2026 | `Đã commit` | Thanh progress bar có đoạn màu đỏ báo quá tải, lấy max_safe_workload_hours động |
+| **UC-22** | SCR-06A Danh sách 4 thẻ môn: 3 môn hợp lệ và 1 môn vi phạm đỏ IAE201 | Medium (N=3) | TrongHieu | 30/10/2026 | `Đã commit` | PRM393 (8h), SWE302 (7h), AIE411 (7h); IAE201 (+12h, LỖI chưa học tiên quyết NWC203) |
+| **UC-23** | SCR-06B Selected Courses (State lỗi): Nút Lưu BỊ KHÓA & Nút [⇄ Đổi môn] | Hard (N=5) | TrongHieu | 30/10/2026 | `Đã commit` | Nút chân trang màu xám "🔒 Giải quyết 1 xung đột để lưu"; nút Đổi môn mở SCR-05 |
+| **UC-24** | SCR-06B_Resolved Khắc phục xung đột: Đổi sang PRM323, tải 26h Cân bằng | Hard (N=5) | TrongHieu | 30/10/2026 | `Đã commit` | Môn thứ 4 đổi thành PRM323 (4h), tổng 26h; NÚT LƯU MỞ KHÓA MÀU XANH ACTIVE |
+| **UC-25** | Lưu Kế hoạch học tập vào Firestore & Chuyển hướng sang SCR-07 | Medium (N=3) | TrongHieu | 30/10/2026 | `Đã commit` | Ghi dữ liệu kế hoạch hợp lệ vào study_plans trên Cloud Firestore, pushNamed sang SCR-07 |
+| **NOTE-REAL-APP** | **Quy chuẩn Vận hành Thực tế (Phase 2):** Khởi tạo từ 0 môn, nút `[+ Thêm môn]` trên SCR-06A khi không lỗi, lưu local khi chuyển tab, chỉ lưu Cloud khi giải quyết xong xung đột. Áp dụng chuẩn dynamic cho toàn bộ ứng dụng. | Medium (N=4) | | | `Đã ghi nhận đặc tả` | Đặc tả chi tiết tại docs/architecture.md mục 5.5 và Resource/flutter-handoff.md mục 3.6 |
 
 ---
 

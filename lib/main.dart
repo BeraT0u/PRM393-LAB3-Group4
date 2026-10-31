@@ -6,7 +6,11 @@ import 'screens/course_catalog_screen.dart';
 import 'screens/course_detail_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/plan_analyzer_screen.dart';
+import 'screens/profile_screen.dart';
+import 'screens/selected_courses_screen.dart';
 import 'theme/app_theme.dart';
+import 'widgets/main_scaffold.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,8 +40,22 @@ class EduPlanApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/completed-courses': (context) => const CompletedCoursesScreen(),
         '/catalog': (context) => const CourseCatalogScreen(),
-        '/course-detail': (context) => CourseDetailScreen(
-              courseCode: (ModalRoute.of(context)?.settings.arguments as String?) ?? 'PRM393',
+        '/course-detail': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final code = (args is Map ? args['courseCode'] as String? : (args is String ? args : null)) ?? 'PRM393';
+          return CourseDetailScreen(courseCode: code);
+        },
+        '/plan-analyzer': (context) => const PlanAnalyzerScreen(),
+        '/selected-courses': (context) => const SelectedCoursesScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/summary': (context) => const MainScaffold(
+              currentTabIndex: 0,
+              appBar: AppTopBar(
+                title: 'Tổng Kết Kế Hoạch',
+                subtitle: 'Fall 2024 • Kế hoạch học tập',
+                showBack: true,
+              ),
+              body: Center(child: Text('SCR-07: Tổng Kết Kế Hoạch Kỳ (Nhóm 5)')),
             ),
       },
     );
