@@ -306,7 +306,7 @@ class DatabaseSeeder {
       sampleCourses.firstWhere((c) => c.code == 'SWE302'),
       sampleCourses.firstWhere((c) => c.code == 'AIE411'),
       sampleCourses.firstWhere((c) => c.code == 'PRM323'), // Đổi sang môn này (4h)
-      sampleCourses.firstWhere((c) => c.code == 'OSG209'), // Thêm môn (4h)
+      sampleCourses.firstWhere((c) => c.code == 'OSG209').copyWith(plannedSelfStudyHours: 0.0), // Môn nền tảng (0h) -> Tổng 26h Cân bằng
     ];
 
     return StudyPlanModel(

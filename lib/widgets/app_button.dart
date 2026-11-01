@@ -151,12 +151,15 @@ class AppTonalButton extends StatelessWidget {
                 Icon(icon, size: 16, color: AppColors.primaryBluePressed),
                 const SizedBox(width: AppSpacing.xs),
               ],
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryBluePressed,
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryBluePressed,
+                  ),
                 ),
               ),
             ],

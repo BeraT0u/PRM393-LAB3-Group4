@@ -200,7 +200,9 @@ class StudentService {
       }
 
       final planData = planDoc.data()!;
-      final coursesList = (planData['selectedCourses'] as List<dynamic>?) ?? [];
+      final coursesList = (planData['courses'] as List<dynamic>?) ??
+          (planData['selectedCourses'] as List<dynamic>?) ??
+          [];
       final profile = await getStudentProfile(uid);
 
       final batch = firestore.batch();

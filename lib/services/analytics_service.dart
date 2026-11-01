@@ -169,4 +169,25 @@ class AnalyticsService {
       AppLogger.warning('Analytics logSaveStudyPlan error: $e');
     }
   }
+
+  /// Ghi nhận sự kiện export_report (UC-36 / Nhóm 5)
+  Future<void> logExportReport({
+    required String format,
+    required int coursesCount,
+    required int totalCredits,
+  }) async {
+    try {
+      await _analytics?.logEvent(
+        name: 'export_report',
+        parameters: {
+          'format': format,
+          'courses_count': coursesCount,
+          'total_credits': totalCredits,
+        },
+      );
+      AppLogger.info('Analytics: Đã ghi nhận export_report ($format, $coursesCount môn, $totalCredits TC)');
+    } catch (e) {
+      AppLogger.warning('Analytics logExportReport error: $e');
+    }
+  }
 }

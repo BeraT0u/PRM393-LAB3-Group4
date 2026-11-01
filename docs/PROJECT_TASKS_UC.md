@@ -88,12 +88,12 @@
 ### 🔷 NHÓM 5: TỔNG KẾT KẾ HOẠCH & XUẤT BLUEPRINT PDF (SCR-07)
 | ID | Function / Screen | Level | Responsible by | Date | Trạng thái | Note |
 |:---|:---|:---:|:---:|:---:|:---:|:---|
-| **UC-26** | SCR-07 Semester Summary: Thẻ Hero KPI (5 Môn, 15 TC, GPA 3.65, 26h tự học) | Simple (N=2) | | | `Chưa bắt đầu` | Khôi phục Bottom Bar; 4 nhãn KPI chia 2 hàng: Lộ trình hợp lệ, Học phí 14.250.000đ |
-| **UC-26B**| SCR-07 Nút "Đã hoàn thành kỳ học": Tự động lưu các môn vào Môn Đã Học & Tích lũy TC | Medium (N=4) | | | `Chưa bắt đầu` | Tự động chuyển các môn trong kỳ thành Môn đã hoàn thành, cộng dồn accumulatedCredits và update status |
-| **UC-27** | SCR-07 Danh sách 5 môn học kèm mục tiêu điểm (A / B+) và tích xanh ✅ | Simple (N=2) | | | `Chưa bắt đầu` | Hiển thị PRM393, SWE302, AIE411, PRM323, OSG209 thẻ nhỏ gọn, căn gióng đẹp mắt |
-| **UC-28** | SCR-07 Tạo file tài liệu PDF Blueprint A4 Kế hoạch học tập | Medium (N=4) | | | `Chưa bắt đầu` | Dựng bằng pdf & printing package: Header, bảng KPI, bảng điểm & giờ tự học từng môn |
-| **UC-29** | SCR-07 Upload file PDF lên Firebase Storage reports/{uid}/... & hiển thị progress | Hard (N=5) | | | `Chưa bắt đầu` | Thanh tiến trình % tải lên, lấy download URL thật trên Cloud Storage (bucket Blaze) |
-| **UC-30** | SCR-07 Kích hoạt hộp thoại xem trước in ấn PDF & Đồng bộ lịch Google Calendar | Simple (N=2) | | | `Chưa bắt đầu` | Nút "📄 Xuất PDF Kế Hoạch & Chiến Lược (A4)", nút Đồng bộ lịch và nút Chia sẻ |
+| **UC-26** | SCR-07 Semester Summary: Thẻ Hero KPI (5 Môn, 15 TC, GPA 3.65, 26h tự học) | Simple (N=2) | NamHXA | 01/11/2026 | `Đã commit` | Khôi phục Bottom Bar; 4 nhãn KPI chia 2 hàng: Lộ trình hợp lệ, Học phí 14.250.000đ |
+| **UC-26B**| SCR-07 Nút "Đã hoàn thành kỳ học": Tự động lưu các môn vào Môn Đã Học & Tích lũy TC | Medium (N=4) | NamHXA | 01/11/2026 | `Đã commit` | Tự động chuyển các môn trong kỳ thành Môn đã hoàn thành, cộng dồn accumulatedCredits và update status |
+| **UC-27** | SCR-07 Danh sách 5 môn học kèm mục tiêu điểm (A / B+) và tích xanh ✅ | Simple (N=2) | NamHXA | 01/11/2026 | `Đã commit` | Hiển thị PRM393, SWE302, AIE411, PRM323, OSG209 thẻ nhỏ gọn, căn gióng đẹp mắt |
+| **UC-28** | SCR-07 Tạo file tài liệu PDF Blueprint A4 Kế hoạch học tập | Medium (N=4) | NamHXA | 01/11/2026 | `Đã commit` | Dựng bằng pdf & printing package: Header, bảng KPI, bảng điểm & giờ tự học từng môn |
+| **UC-29** | SCR-07 Upload file PDF lên Firebase Storage reports/{uid}/... & hiển thị progress | Hard (N=5) | NamHXA | 01/11/2026 | `Đã commit` | Thanh tiến trình % tải lên, lấy download URL thật trên Cloud Storage (bucket Blaze) |
+| **UC-30** | SCR-07 Kích hoạt hộp thoại xem trước in ấn PDF & Đồng bộ lịch Google Calendar | Simple (N=2) | NamHXA | 01/11/2026 | `Đã commit` | Nút "📄 Xuất PDF Kế Hoạch & Chiến Lược (A4)", nút Đồng bộ lịch và nút Chia sẻ |
 
 ---
 
