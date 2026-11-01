@@ -5,6 +5,9 @@ import '../utils/app_logger.dart';
 class AnalyticsService {
   final FirebaseAnalytics? _analytics;
 
+  /// Thời điểm bắt đầu phiên đăng nhập (dùng tính `session_duration_sec` khi logout).
+  static DateTime? _sessionStart;
+
   AnalyticsService({FirebaseAnalytics? analytics})
       : _analytics = analytics ?? (Firebase.apps.isNotEmpty ? FirebaseAnalytics.instance : null);
 
@@ -18,11 +21,49 @@ class AnalyticsService {
   }
 
   Future<void> logLogin({String method = 'google'}) async {
+    _sessionStart = DateTime.now();
     try {
       await _analytics?.logLogin(loginMethod: method);
       AppLogger.info('Analytics: Đã ghi nhận sự kiện login');
     } catch (e) {
       AppLogger.warning('Analytics logLogin error: $e');
+    }
+  }
+
+  /// Sự kiện `logout` — `session_duration_sec` tính từ lúc login thành công.
+  Future<void> logLogout() async {
+    final start = _sessionStart;
+    final seconds = start == null ? 0 : DateTime.now().difference(start).inSeconds;
+    _sessionStart = null;
+    try {
+      await _analytics?.logEvent(
+        name: 'logout',
+        parameters: {'session_duration_sec': seconds},
+      );
+      AppLogger.info('Analytics: Đã ghi nhận logout (${seconds}s)');
+    } catch (e) {
+      AppLogger.warning('Analytics logLogout error: $e');
+    }
+  }
+
+  /// Sự kiện `export_report` — dùng cho nút xuất PDF ở SCR-07 (Nhóm 5).
+  Future<void> logExportReport({
+    String format = 'pdf',
+    required int coursesCount,
+    required int totalCredits,
+  }) async {
+    try {
+      await _analytics?.logEvent(
+        name: 'export_report',
+        parameters: {
+          'format': format,
+          'courses_count': coursesCount,
+          'total_credits': totalCredits,
+        },
+      );
+      AppLogger.info('Analytics: Đã ghi nhận export_report ($coursesCount môn)');
+    } catch (e) {
+      AppLogger.warning('Analytics logExportReport error: $e');
     }
   }
 
@@ -68,7 +109,7 @@ class AnalyticsService {
         parameters: {
           'course_id': courseId,
           'target_grade': targetGrade,
-          'estimated_hours': estimatedHours,
+          'planned_hours': estimatedHours.round(),
         },
       );
     } catch (e) {
@@ -135,7 +176,7 @@ class AnalyticsService {
   }) async {
     try {
       await _analytics?.logEvent(
-        name: 'resolve_conflict',
+        name: 'resolve_plan_conflict',
         parameters: {
           'old_course_id': oldCourseId,
           'new_course_id': newCourseId,

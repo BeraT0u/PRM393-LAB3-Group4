@@ -90,12 +90,15 @@ class _PlanAnalyzerScreenState extends ConsumerState<PlanAnalyzerScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
+                  child: Semantics(
+                    header: true,
+                    child: Text(
                     'Phân bổ thời gian môn học (${state.courseCount})',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
+                  ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
@@ -155,7 +158,11 @@ class _WorkloadMeterCard extends StatelessWidget {
     final double safeRatio = (threshold / maxScale).clamp(0.0, 1.0);
     final double totalRatio = (totalHours / maxScale).clamp(0.0, 1.0);
 
-    return Container(
+    return Semantics(
+      container: true,
+      label: 'Workload Meter: tổng ${totalHours.toInt()} giờ tự học mỗi tuần, '
+          '${isOverloaded ? 'vượt' : 'trong'} ngưỡng an toàn ${threshold.toInt()} giờ',
+      child: Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
@@ -272,6 +279,7 @@ class _WorkloadMeterCard extends StatelessWidget {
             ],
           ),
         ],
+      ),
       ),
     );
   }

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/course_model.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
+import '../services/service_providers.dart';
 import '../utils/course_filter.dart';
 import '../viewmodels/course_catalog_viewmodel.dart';
 import '../viewmodels/plan_analyzer_viewmodel.dart';
@@ -27,6 +30,7 @@ class CourseCatalogScreen extends ConsumerStatefulWidget {
 
 class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
   final _searchController = TextEditingController();
+  Timer? _searchDebounce;
   bool _initializedArgs = false;
 
   @override
@@ -59,8 +63,21 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Ghi nhận sự kiện `search` sau khi người dùng dừng gõ 800ms.
+  void _scheduleSearchLog(String query) {
+    _searchDebounce?.cancel();
+    final term = query.trim();
+    if (term.isEmpty) return;
+    _searchDebounce = Timer(const Duration(milliseconds: 800), () {
+      if (!mounted) return;
+      final count = ref.read(courseCatalogViewModelProvider).value?.filteredCourses.length ?? 0;
+      ref.read(analyticsServiceProvider).logSearch(searchTerm: term, resultCount: count);
+    });
   }
 
   void _openCourse(CourseModel course, {String? replacingCourseCode}) {
@@ -185,6 +202,7 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
                   controller: _searchController,
                   onChanged: (q) {
                     vm.setQuery(q);
+                    _scheduleSearchLog(q);
                     setState(() {});
                   },
                 ),

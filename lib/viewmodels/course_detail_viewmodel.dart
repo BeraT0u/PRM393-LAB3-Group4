@@ -68,6 +68,12 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
       prerequisiteMet = passed.contains(prereq);
     }
 
+    ref.read(analyticsServiceProvider).logViewCourseDetail(
+      courseId: course.code,
+      courseName: course.name,
+      credits: course.credits,
+    );
+
     return CourseDetailState(
       course: course,
       target: GradeTargetOption.fromCode(course.selectedGradeTarget),
@@ -84,6 +90,11 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
     final current = state.value;
     if (current == null) return;
     state = AsyncData(current.copyWith(target: target));
+    ref.read(analyticsServiceProvider).logSelectGradeTarget(
+          courseId: current.course.code,
+          targetGrade: target.code,
+          estimatedHours: target.hoursFor(current.course),
+        );
   }
 
   void toggleFavorite() {

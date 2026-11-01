@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import '../models/student_profile_model.dart';
+import '../services/analytics_service.dart';
 import '../services/student_service.dart';
 import '../widgets/main_scaffold.dart';
 
@@ -16,6 +17,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _studentService = StudentService();
+  final _analytics = AnalyticsService();
 
   StudentProfileModel? _profile;
   bool _isLoading = true;
@@ -104,51 +106,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF333333),
-                          side: const BorderSide(color: Color(0xFFE0E0E0)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                      child: Semantics(
+                        button: true,
+                        label: 'Hủy đăng xuất',
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF333333),
+                            side: const BorderSide(color: Color(0xFFE0E0E0)),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Hủy',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          child: const Text(
+                            'Hủy',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(context);
+                      child: Semantics(
+                        button: true,
+                        label: 'Xác nhận đăng xuất tài khoản',
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
 
-                          await FirebaseAuth.instance.signOut();
-                          await GoogleSignIn().signOut();
+                            await _analytics.logLogout();
+                            await FirebaseAuth.instance.signOut();
+                            await GoogleSignIn().signOut();
 
-                          if (context.mounted) {
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              '/login',
-                              (route) => false,
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE53935),
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            if (context.mounted) {
+                              Navigator.pushNamedAndRemoveUntil(
+                                context,
+                                '/login',
+                                (route) => false,
+                              );
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE53935),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Đăng xuất',
-                          style: TextStyle(fontWeight: FontWeight.w600),
+                          child: const Text(
+                            'Đăng xuất',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                     ),
@@ -209,6 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               // Avatar bấm vào chuyển hướng sang UserDetailProfileScreen và đợi tải lại dữ liệu
               GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () async {
                   await Navigator.push(
                     context,
@@ -220,7 +232,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Tải lại dữ liệu mới nhất từ Firebase khi quay lại
                   _loadProfile();
                 },
-                child: Stack(
+                child: Semantics(
+                  button: true,
+                  label: 'Xem chi tiết hồ sơ cá nhân',
+                  child: Stack(
                   children: [
                     CircleAvatar(
                       radius: 32,
@@ -258,6 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -426,23 +442,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton.icon(
-        onPressed: _showLogoutDialog,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFFD32F2F),
-          side: const BorderSide(color: Color(0xFFFFCDD2)),
-          backgroundColor: const Color(0xFFFFF5F5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    return Semantics(
+      button: true,
+      label: 'Đăng xuất tài khoản',
+      child: SizedBox(
+        width: double.infinity,
+        height: 48,
+        child: OutlinedButton.icon(
+          onPressed: _showLogoutDialog,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFD32F2F),
+            side: const BorderSide(color: Color(0xFFFFCDD2)),
+            backgroundColor: const Color(0xFFFFF5F5),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
           ),
-        ),
-        icon: const Icon(Icons.logout_rounded, size: 18),
-        label: const Text(
-          'Đăng xuất tài khoản',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          icon: const Icon(Icons.logout_rounded, size: 18),
+          label: const Text(
+            'Đăng xuất tài khoản',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
         ),
       ),
     );

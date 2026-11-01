@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 
@@ -71,6 +72,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         credential,
       );
       
+      final analytics = ref.read(analyticsServiceProvider);
+      final uid = userCredential.user?.uid;
+      if (uid != null) await analytics.setUserId(uid);
+      await analytics.logLogin(method: 'google');
+
       if (!mounted) return;
       setState(() => _isLoading = false);
 
