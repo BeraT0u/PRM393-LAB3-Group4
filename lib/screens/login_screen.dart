@@ -1,6 +1,9 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 
@@ -19,10 +22,7 @@ import '../theme/app_dimens.dart';
 class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback? onSignInSuccess;
 
-  const LoginScreen({
-    super.key,
-    this.onSignInSuccess,
-  });
+  const LoginScreen({super.key, this.onSignInSuccess});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -46,14 +46,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     // Chuyển sang trạng thái SCR-01_Loading (delay 800ms theo đặc tả handoff)
     await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      // 1. Mở màn hình chọn tài khoản Google
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      if (googleUser == null) {
+        // Người dùng bấm hủy
+        setState(() => _isLoading = false);
+        return;
+      }
 
-    if (widget.onSignInSuccess != null) {
-      widget.onSignInSuccess!();
-    } else {
-      Navigator.pushReplacementNamed(context, '/home');
+      // 2. Lấy authentication từ Google
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // 3. Tạo credential cho Firebase
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // 4. Đăng nhập vào Firebase
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+      
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (widget.onSignInSuccess != null) {
+        widget.onSignInSuccess!();
+      } else {
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      // Hiển thị thông báo lỗi
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đăng nhập thất bại: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -74,7 +109,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   // Hoạ tiết giấy học thuật tinh tế ở 2 góc trên (Khớp SCR-01_Login.png)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -83,13 +120,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           child: Icon(
                             Icons.attach_file_rounded,
                             size: 42,
-                            color: AppColors.borderStructural.withValues(alpha: 0.75),
+                            color: AppColors.borderStructural.withValues(
+                              alpha: 0.75,
+                            ),
                           ),
                         ),
                         Icon(
                           Icons.star_border_rounded,
                           size: 42,
-                          color: AppColors.borderStructural.withValues(alpha: 0.75),
+                          color: AppColors.borderStructural.withValues(
+                            alpha: 0.75,
+                          ),
                         ),
                       ],
                     ),
@@ -105,7 +146,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     decoration: BoxDecoration(
                       color: AppColors.surfaceCard,
                       borderRadius: BorderRadius.circular(AppRadius.card),
-                      border: Border.all(color: AppColors.borderStructural, width: 1.0),
+                      border: Border.all(
+                        color: AppColors.borderStructural,
+                        width: 1.0,
+                      ),
                       boxShadow: AppElevation.softShadow,
                     ),
                     child: Column(
@@ -128,7 +172,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       decoration: BoxDecoration(
                                         color: AppColors.surfaceCard,
                                         borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: AppColors.borderStructural),
+                                        border: Border.all(
+                                          color: AppColors.borderStructural,
+                                        ),
                                       ),
                                       child: const Icon(
                                         Icons.menu_book_rounded,
@@ -205,7 +251,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               style: OutlinedButton.styleFrom(
                                 backgroundColor: AppColors.surfaceLowest,
                                 foregroundColor: AppColors.textPrimary,
-                                disabledBackgroundColor: AppColors.surfaceLowest,
+                                disabledBackgroundColor:
+                                    AppColors.surfaceLowest,
                                 side: const BorderSide(
                                   color: AppColors.borderStructural,
                                   width: 1.0,
@@ -217,10 +264,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   horizontal: AppSpacing.lg,
                                 ),
                               ),
-                              onPressed: _isLoading ? null : _handleGoogleSignIn,
+                              onPressed: _isLoading
+                                  ? null
+                                  : _handleGoogleSignIn,
                               child: _isLoading
                                   ? const Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         SizedBox(
@@ -247,7 +297,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ],
                                     )
                                   : Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         SvgPicture.string(
@@ -261,11 +312,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             'Đăng nhập bằng Google',
                                             overflow: TextOverflow.ellipsis,
                                             maxLines: 1,
-                                            style: theme.textTheme.labelLarge?.copyWith(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w600,
-                                              color: AppColors.textPrimary,
-                                            ),
+                                            style: theme.textTheme.labelLarge
+                                                ?.copyWith(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.textPrimary,
+                                                ),
                                           ),
                                         ),
                                       ],
@@ -306,7 +358,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ],
                         ),
                         const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs,
+                          ),
                           child: Text(
                             '•',
                             style: TextStyle(
