@@ -29,9 +29,24 @@ class CourseService {
         return DatabaseSeeder.sampleCourses;
       }
 
-      return snapshot.docs.map((doc) {
+      final remoteCourses = snapshot.docs.map((doc) {
         return CourseModel.fromMap(doc.data(), doc.id);
       }).toList();
+
+      // Đảm bảo có đầy đủ cả các môn cơ sở trong danh mục nếu trên Firestore chưa có
+      final existingCodes = remoteCourses.map((c) => c.code).toSet();
+      final missingCourses = DatabaseSeeder.sampleCourses
+          .where((c) => !existingCodes.contains(c.code))
+          .toList();
+
+      if (missingCourses.isNotEmpty) {
+        for (final course in missingCourses) {
+          remoteCourses.add(course);
+          ref.doc(course.id).set(course.toMap()).ignore();
+        }
+      }
+
+      return remoteCourses;
     } catch (e, st) {
       AppLogger.warning('Lỗi khi tải môn học từ Firestore, sử dụng dữ liệu cục bộ: $e');
       AppLogger.error('Lỗi getCourses', e, st);

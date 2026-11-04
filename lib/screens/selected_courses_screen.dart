@@ -4,17 +4,25 @@ import '../models/course_model.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_typography.dart';
+import '../utils/grade_target.dart';
+import '../viewmodels/course_catalog_viewmodel.dart';
 import '../viewmodels/plan_analyzer_viewmodel.dart';
 import '../widgets/widgets.dart';
 
 /// UC-23, UC-24, UC-25: SCR-06B — Selected Courses & SCR-06B_Resolved
-/// - Trạng thái lỗi (UC-23): Nút Lưu BỊ KHÓA xám "🔒 Giải quyết 1 xung đột để lưu",
-///   môn IAE201 viền đỏ có nút [⇄ Đổi môn khác].
-/// - Khắc phục xung đột (UC-24): Đổi sang PRM323, tải giảm về 26h Cân bằng ✅,
+/// - Trạng thái lỗi (UC-23): Nút Lưu BỊ KHÓA xám "🔒 Giải quyết N xung đột để lưu",
+///   môn xung đột viền đỏ có nút [⇄ Đổi môn khác].
+/// - Khắc phục xung đột (UC-24): Đổi môn hoặc hạ mục tiêu điểm để tải <= 25h Cân bằng ✅,
 ///   NÚT LƯU MỞ KHÓA MÀU XANH ACTIVE "Lưu Kế Hoạch Học Tập".
 /// - Lưu kế hoạch (UC-25): Ghi vào Cloud Firestore study_plans và chuyển hướng sang SCR-07.
 class SelectedCoursesScreen extends ConsumerWidget {
   const SelectedCoursesScreen({super.key});
+
+  static String _formatHours(double hours) {
+    return hours == hours.roundToDouble()
+        ? '${hours.toInt()}h'
+        : '${hours.toStringAsFixed(1)}h';
+  }
 
   void _handleReplaceCourse(BuildContext context, CourseModel conflictCourse) {
     Navigator.of(context).pushNamed(
@@ -26,6 +34,81 @@ class SelectedCoursesScreen extends ConsumerWidget {
     );
   }
 
+  void _openCatalogToAdd(BuildContext context, WidgetRef ref) {
+    ref
+        .read(courseCatalogViewModelProvider.notifier)
+        .setOnlyEligible(false, replacingCourseCode: null);
+    Navigator.of(context).pushNamed('/catalog');
+  }
+
+  void _showChangeTargetSheet(
+    BuildContext context,
+    WidgetRef ref,
+    CourseModel course,
+  ) {
+    final vm = ref.read(planAnalyzerViewModelProvider.notifier);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Đổi mục tiêu điểm: ${course.name} (${course.code})',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                const Text(
+                  'Điều chỉnh mục tiêu điểm giúp cân bằng quỹ thời gian tự học mỗi tuần.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                for (final option in GradeTargetOption.all) ...[
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    leading: Icon(
+                      course.selectedGradeTarget == option.code
+                          ? Icons.radio_button_checked_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      color: course.selectedGradeTarget == option.code
+                          ? AppColors.primaryBlue
+                          : AppColors.textSecondary,
+                    ),
+                    title: Text(
+                      'Mục tiêu: ${option.title} (${option.threshold})',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      'Tự học: ${GradeTargetOption.formatHours(option.hoursFor(course))}/tuần • ${option.note}',
+                    ),
+                    onTap: () {
+                      vm.updateCourseTarget(course.code, option);
+                      Navigator.of(sheetCtx).pop();
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleSavePlan(BuildContext context, WidgetRef ref) async {
     final vm = ref.read(planAnalyzerViewModelProvider.notifier);
     final success = await vm.savePlan();
@@ -33,11 +116,14 @@ class SelectedCoursesScreen extends ConsumerWidget {
     if (!context.mounted) return;
 
     if (success) {
+      final state = ref.read(planAnalyzerViewModelProvider);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('🎉 Đã lưu Kế hoạch học tập Fall 2024 vào Cloud Firestore!'),
+        SnackBar(
+          content: Text(
+            '🎉 Đã lưu Kế hoạch học tập ${state.plan.semester} (${state.courseCount} môn) vào Cloud Firestore!',
+          ),
           backgroundColor: AppColors.successBorder,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
 
@@ -50,7 +136,9 @@ class SelectedCoursesScreen extends ConsumerWidget {
       final state = ref.read(planAnalyzerViewModelProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(state.errorMessage ?? 'Không thể lưu kế hoạch. Vui lòng thử lại.'),
+          content: Text(
+            state.errorMessage ?? 'Không thể lưu kế hoạch. Vui lòng thử lại.',
+          ),
           backgroundColor: AppColors.dangerBorder,
         ),
       );
@@ -65,24 +153,58 @@ class SelectedCoursesScreen extends ConsumerWidget {
 
     return MainScaffold(
       showBottomBar: false,
-      appBar: const AppTopBar(
+      appBar: AppTopBar(
         title: 'Môn Đã Chọn',
-        subtitle: 'Fall 2024 • Quản lý danh sách môn',
+        subtitle: '${state.plan.semester} • Quản lý danh sách môn',
         showBack: true,
+        actions: [
+          if (!hasConflict)
+            TextButton.icon(
+              onPressed: () => _openCatalogToAdd(context, ref),
+              icon: const Icon(
+                Icons.add_circle_outline_rounded,
+                size: 18,
+                color: AppColors.primaryBlue,
+              ),
+              label: const Text(
+                'Thêm môn',
+                style: TextStyle(
+                  color: AppColors.primaryBlue,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          if (state.courseCount > 0)
+            IconButton(
+              tooltip: 'Xóa toàn bộ môn đã chọn',
+              onPressed: vm.clearPlan,
+              icon: const Icon(
+                Icons.delete_sweep_outlined,
+                color: AppColors.textSecondary,
+              ),
+            ),
+        ],
       ),
       // Nút chân trang: Khóa khi còn lỗi (UC-23) - Mở khóa xanh khi đã giải quyết (UC-24)
-      dockedFooter: hasConflict
-          ? const AppPrimaryButton(
-              label: '🔒 Giải quyết 1 xung đột để lưu',
-              semanticsLabel: 'Nút lưu bị khóa do có xung đột',
-              onPressed: null,
+      dockedFooter: state.courseCount == 0
+          ? AppPrimaryButton(
+              label: '+ Chọn môn học từ danh mục',
+              semanticsLabel: 'Chọn môn học từ danh mục',
+              onPressed: () => _openCatalogToAdd(context, ref),
             )
-          : AppPrimaryButton(
-              label: 'Lưu Kế Hoạch Học Tập',
-              semanticsLabel: 'Lưu Kế Hoạch Học Tập hợp lệ vào Firestore',
-              isLoading: state.isSaving,
-              onPressed: () => _handleSavePlan(context, ref),
-            ),
+          : hasConflict
+              ? AppPrimaryButton(
+                  label: '🔒 Giải quyết ${state.conflictCount} xung đột để lưu',
+                  semanticsLabel: 'Nút lưu bị khóa do có xung đột',
+                  onPressed: null,
+                )
+              : AppPrimaryButton(
+                  label: 'Lưu Kế Hoạch Học Tập',
+                  semanticsLabel: 'Lưu Kế Hoạch Học Tập hợp lệ vào Firestore',
+                  isLoading: state.isSaving,
+                  onPressed: () => _handleSavePlan(context, ref),
+                ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
@@ -103,31 +225,86 @@ class SelectedCoursesScreen extends ConsumerWidget {
                   color: AppColors.textPrimary,
                 ),
           ),
+          if (state.courseCount > 0) ...[
+            const SizedBox(height: 2),
+            const Text(
+              'Chạm vào thẻ môn để đổi mục tiêu điểm (A / B / Qua môn)',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
 
-          // Danh sách môn đã chọn
-          for (final course in state.plan.selectedCourses) ...[
-            Builder(
-              builder: (ctx) {
-                final isViolated = course.prerequisiteCode != null &&
-                    !state.passedCourseCodes.contains(course.prerequisiteCode);
+          if (state.courseCount == 0)
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.xl),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceCard,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.borderStructural),
+              ),
+              child: const Column(
+                children: [
+                  Icon(
+                    Icons.inbox_outlined,
+                    size: 40,
+                    color: AppColors.textDisabled,
+                  ),
+                  SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Chưa có môn học nào trong danh sách.',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Nhấn "+ Chọn môn học từ danh mục" bên dưới để thêm môn vào kế hoạch kỳ này.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            // Danh sách môn đã chọn
+            for (final course in state.plan.selectedCourses) ...[
+              Builder(
+                builder: (ctx) {
+                  final isViolated = !state.isCoursePrerequisiteMet(course);
+                  final isOverloadFocus = !isViolated &&
+                      state.prerequisiteViolations.isEmpty &&
+                      state.isOverloaded &&
+                      state.conflictCourse?.code == course.code;
 
-                return CourseStrategyCard(
-                  course: course,
-                  variant: CourseCardVariant.selected,
-                  hasConflict: isViolated,
-                  conflictMessage: isViolated
-                      ? 'Lỗi: Chưa học tiên quyết ${course.prerequisiteCode} • ${course.credits} TC • ${course.plannedSelfStudyHours.toInt()}h/tuần'
-                      : null,
-                  onReplace: isViolated
-                      ? () => _handleReplaceCourse(context, course)
-                      : null,
-                  onRemove: () => vm.removeCourse(course),
-                );
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-          ],
+                  final showCardConflict = isViolated || isOverloadFocus;
+                  String? conflictMsg;
+                  if (isViolated) {
+                    conflictMsg =
+                        'Lỗi: Chưa học tiên quyết ${course.prerequisiteCode} • ${course.credits} TC • ${_formatHours(course.plannedSelfStudyHours)}/tuần';
+                  } else if (isOverloadFocus) {
+                    conflictMsg =
+                        'Quá tải: Môn chiếm ${_formatHours(course.plannedSelfStudyHours)}/tuần (vượt ngưỡng ${state.maxSafeThresholdHours.toInt()}h) • Đổi môn hoặc hạ mục tiêu điểm';
+                  }
+
+                  return CourseStrategyCard(
+                    course: course,
+                    variant: CourseCardVariant.selected,
+                    hasConflict: showCardConflict,
+                    conflictMessage: conflictMsg,
+                    onTap: () => _showChangeTargetSheet(context, ref, course),
+                    onReplace: showCardConflict
+                        ? () => _handleReplaceCourse(context, course)
+                        : null,
+                    onRemove: () => vm.removeCourse(course),
+                  );
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+            ],
         ],
       ),
     );
@@ -140,10 +317,25 @@ class _SelectedOverviewCard extends StatelessWidget {
 
   const _SelectedOverviewCard({required this.state});
 
+  static String _formatHours(double hours) {
+    return hours == hours.roundToDouble()
+        ? '${hours.toInt()}h'
+        : '${hours.toStringAsFixed(1)}h';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasConflict = state.hasConflict;
+
+    String conflictDetailText = '';
+    if (state.prerequisiteViolations.isNotEmpty) {
+      conflictDetailText =
+          '⚠️ ${state.prerequisiteViolations.length} môn vi phạm tiên quyết (${state.prerequisiteViolations.join(", ")})';
+    } else if (state.isOverloaded) {
+      conflictDetailText =
+          '⚠️ Tổng giờ tự học vượt ngưỡng an toàn ${state.maxSafeThresholdHours.toInt()}h/tuần';
+    }
 
     return Container(
       width: double.infinity,
@@ -152,7 +344,8 @@ class _SelectedOverviewCard extends StatelessWidget {
         color: hasConflict ? AppColors.dangerSurface : AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
-          color: hasConflict ? AppColors.dangerBorder : AppColors.borderStructural,
+          color:
+              hasConflict ? AppColors.dangerBorder : AppColors.borderStructural,
           width: hasConflict ? 1.5 : 1.0,
         ),
         boxShadow: AppElevation.softShadow,
@@ -171,38 +364,57 @@ class _SelectedOverviewCard extends StatelessWidget {
                 ),
               ),
               StatusBadge(
-                label: hasConflict ? '1 Xung đột ⚠️' : 'Cân bằng ✅',
-                type: hasConflict ? StatusBadgeType.danger : StatusBadgeType.success,
+                label: hasConflict
+                    ? '${state.conflictCount} Xung đột ⚠️'
+                    : 'Cân bằng ✅',
+                type: hasConflict
+                    ? StatusBadgeType.danger
+                    : StatusBadgeType.success,
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
             hasConflict
-                ? 'Tổng khối lượng: ${state.totalHours.toInt()}h/tuần (Quá tải)'
-                : 'Tổng khối lượng: ${state.totalHours.toInt()}h tự học/tuần (Cân bằng ✅)',
-            style: theme.textTheme.bodyMedium?.merge(tabularNumberStyle).copyWith(
-                  color: hasConflict ? AppColors.dangerText : AppColors.successText,
+                ? (state.isOverloaded
+                    ? 'Tổng khối lượng: ${_formatHours(state.totalHours)}/tuần (Quá tải)'
+                    : 'Tổng khối lượng: ${_formatHours(state.totalHours)}/tuần (Lỗi tiên quyết)')
+                : 'Tổng khối lượng: ${_formatHours(state.totalHours)} tự học/tuần (Cân bằng ✅)',
+            style: theme.textTheme.bodyMedium
+                ?.merge(tabularNumberStyle)
+                .copyWith(
+                  color:
+                      hasConflict ? AppColors.dangerText : AppColors.successText,
                   fontWeight: FontWeight.w600,
                 ),
           ),
-          if (hasConflict) ...[
+          if (hasConflict && conflictDetailText.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: AppColors.surfaceLowest,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.dangerBorder.withValues(alpha: 0.5)),
+                border: Border.all(
+                  color: AppColors.dangerBorder.withValues(alpha: 0.5),
+                ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.dangerText),
-                  SizedBox(width: 6),
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 16,
+                    color: AppColors.dangerText,
+                  ),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '⚠️ 1 môn vi phạm tiên quyết (IAE201 cần NWC203)',
-                      style: TextStyle(fontSize: 12, color: AppColors.dangerText, fontWeight: FontWeight.bold),
+                      conflictDetailText,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.dangerText,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],

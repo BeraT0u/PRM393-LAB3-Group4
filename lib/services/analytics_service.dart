@@ -46,7 +46,7 @@ class AnalyticsService {
     }
   }
 
-  /// Sự kiện `export_report` — dùng cho nút xuất PDF ở SCR-07 (Nhóm 5).
+  /// Sự kiện `export_report` — dùng cho nút xuất PDF ở SCR-07 (Nhóm 5 / UC-36).
   Future<void> logExportReport({
     String format = 'pdf',
     required int coursesCount,
@@ -61,7 +61,7 @@ class AnalyticsService {
           'total_credits': totalCredits,
         },
       );
-      AppLogger.info('Analytics: Đã ghi nhận export_report ($coursesCount môn)');
+      AppLogger.info('Analytics: Đã ghi nhận export_report ($format, $coursesCount môn, $totalCredits TC)');
     } catch (e) {
       AppLogger.warning('Analytics logExportReport error: $e');
     }

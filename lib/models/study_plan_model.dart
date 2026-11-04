@@ -25,6 +25,8 @@ class StudyPlanModel {
     required this.updatedAt,
   });
 
+  String get semester => semesterName;
+
   int get totalCredits => selectedCourses.fold(0, (sum, c) => sum + c.credits);
 
   double get totalSelfStudyHours =>
@@ -38,7 +40,9 @@ class StudyPlanModel {
     for (final course in selectedCourses) {
       if (course.prerequisiteCode != null &&
           !passedCodes.contains(course.prerequisiteCode)) {
-        violations.add('${course.code} (chưa học tiên quyết ${course.prerequisiteCode})');
+        violations.add(
+          '${course.code} (chưa học tiên quyết ${course.prerequisiteCode})',
+        );
       }
     }
     return violations;
@@ -65,7 +69,8 @@ class StudyPlanModel {
       userId: userId ?? this.userId,
       semesterName: semesterName ?? this.semesterName,
       selectedCourses: selectedCourses ?? this.selectedCourses,
-      maxSafeThresholdHours: maxSafeThresholdHours ?? this.maxSafeThresholdHours,
+      maxSafeThresholdHours:
+          maxSafeThresholdHours ?? this.maxSafeThresholdHours,
       targetGpa: targetGpa ?? this.targetGpa,
       tuitionFee: tuitionFee ?? this.tuitionFee,
       isSaved: isSaved ?? this.isSaved,
@@ -91,7 +96,12 @@ class StudyPlanModel {
 
   factory StudyPlanModel.fromMap(Map<String, dynamic> map, String docId) {
     final coursesList = (map['courses'] as List<dynamic>?)
-            ?.map((e) => CourseModel.fromMap(Map<String, dynamic>.from(e), e['id'] ?? ''))
+            ?.map(
+              (e) => CourseModel.fromMap(
+                Map<String, dynamic>.from(e),
+                e['id'] ?? '',
+              ),
+            )
             .toList() ??
         [];
 
@@ -100,7 +110,8 @@ class StudyPlanModel {
       userId: map['userId'] ?? '',
       semesterName: map['semesterName'] ?? 'Fall 2024',
       selectedCourses: coursesList,
-      maxSafeThresholdHours: (map['maxSafeThresholdHours'] as num?)?.toDouble() ?? 25.0,
+      maxSafeThresholdHours:
+          (map['maxSafeThresholdHours'] as num?)?.toDouble() ?? 25.0,
       targetGpa: (map['targetGpa'] as num?)?.toDouble() ?? 3.65,
       tuitionFee: (map['tuitionFee'] as num?)?.toInt() ?? 14250000,
       isSaved: map['isSaved'] ?? false,

@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/course_model.dart';
+import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
-import '../services/service_providers.dart';
 import '../utils/course_filter.dart';
 import '../viewmodels/course_catalog_viewmodel.dart';
 import '../viewmodels/plan_analyzer_viewmodel.dart';
@@ -25,7 +25,8 @@ class CourseCatalogScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CourseCatalogScreen> createState() => _CourseCatalogScreenState();
+  ConsumerState<CourseCatalogScreen> createState() =>
+      _CourseCatalogScreenState();
 }
 
 class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
@@ -40,8 +41,10 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
       _initializedArgs = true;
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is Map) {
-        final bool onlyEligible = args['onlyEligible'] == true || (widget.initialOnlyEligible == true);
-        final String? replacingCode = (args['replacingCourseCode'] as String?) ?? widget.initialReplacingCourseCode;
+        final bool onlyEligible =
+            args['onlyEligible'] == true || (widget.initialOnlyEligible == true);
+        final String? replacingCode = (args['replacingCourseCode'] as String?) ??
+            widget.initialReplacingCourseCode;
         if (onlyEligible) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             ref.read(courseCatalogViewModelProvider.notifier).setOnlyEligible(
@@ -100,12 +103,17 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
     }
   }
 
-  void _showConfirmReplaceDialog(CourseModel course, String replacingCourseCode) {
+  void _showConfirmReplaceDialog(
+    CourseModel course,
+    String replacingCourseCode,
+  ) {
     showDialog<void>(
       context: context,
       builder: (dlgCtx) => AlertDialog(
         backgroundColor: AppColors.surfaceCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
         title: const Row(
           children: [
             Icon(Icons.swap_horiz_rounded, color: AppColors.primaryBlue, size: 26),
@@ -128,13 +136,17 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              '${course.credits} Tín chỉ • Tự học: ${course.plannedSelfStudyHours.toInt()}h/tuần • Tiên quyết: ${course.prerequisiteCode ?? "Không ✅"}',
+              '${course.credits} Tín chỉ • Tự học: ${course.plannedSelfStudyHours == course.plannedSelfStudyHours.roundToDouble() ? course.plannedSelfStudyHours.toInt() : course.plannedSelfStudyHours}h/tuần • Tiên quyết: ${course.prerequisiteCode ?? "Không ✅"}',
               style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: AppSpacing.md),
             const Text(
               '💡 Kế hoạch học tập sẽ được cân bằng và mở khóa nút Lưu!',
-              style: TextStyle(color: AppColors.successText, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: AppColors.successText,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -144,20 +156,39 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
               Navigator.of(dlgCtx).pop();
               _openCourse(course, replacingCourseCode: replacingCourseCode);
             },
-            child: const Text('Xem chiến lược >', style: TextStyle(color: AppColors.textSecondary)),
+            child: const Text(
+              'Xem chiến lược >',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryBlue,
               foregroundColor: AppColors.onPrimaryWhite,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             onPressed: () {
               Navigator.of(dlgCtx).pop();
-              ref.read(planAnalyzerViewModelProvider.notifier).replaceConflictCourse(replacement: course);
+              ref.read(planAnalyzerViewModelProvider.notifier).replaceConflictCourse(
+                    replacement: course,
+                    targetCodeToReplace: replacingCourseCode,
+                  );
+              ref.read(courseCatalogViewModelProvider.notifier).setOnlyEligible(
+                    false,
+                    replacingCourseCode: null,
+                  );
+              final updatedPlanState = ref.read(planAnalyzerViewModelProvider);
+              final hoursStr = updatedPlanState.totalHours ==
+                      updatedPlanState.totalHours.roundToDouble()
+                  ? '${updatedPlanState.totalHours.toInt()}h'
+                  : '${updatedPlanState.totalHours.toStringAsFixed(1)}h';
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('✅ Đã đổi sang ${course.code} thành công! Khối lượng tự học đạt 26h Cân bằng.'),
+                  content: Text(
+                    '✅ Đã đổi sang ${course.code} thành công! Khối lượng tự học đạt $hoursStr ${updatedPlanState.hasConflict ? "⚠️" : "Cân bằng"}.',
+                  ),
                   backgroundColor: AppColors.primaryBlue,
                   duration: const Duration(seconds: 2),
                 ),
@@ -182,10 +213,42 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
     final async = ref.watch(courseCatalogViewModelProvider);
     final vm = ref.read(courseCatalogViewModelProvider.notifier);
     final state = async.value;
+    final planState = ref.watch(planAnalyzerViewModelProvider);
 
     return MainScaffold(
       currentTabIndex: 2,
-      appBar: const AppTopBar(title: 'Tìm Môn'),
+      appBar: AppTopBar(
+        title: 'Tìm Môn',
+        actions: [
+          if (planState.courseCount > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.xs),
+              child: TextButton.icon(
+                onPressed: () =>
+                    Navigator.of(context).pushNamed('/plan-analyzer'),
+                icon: Icon(
+                  planState.hasConflict
+                      ? Icons.warning_amber_rounded
+                      : Icons.analytics_outlined,
+                  size: 18,
+                  color: planState.hasConflict
+                      ? AppColors.dangerText
+                      : AppColors.primaryBlue,
+                ),
+                label: Text(
+                  'Kế hoạch (${planState.courseCount})',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: planState.hasConflict
+                        ? AppColors.dangerText
+                        : AppColors.primaryBlue,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
       body: Column(
         children: [
           // Khối SearchBar & Filter Chips cố định
@@ -221,15 +284,24 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
                   const SizedBox(height: AppSpacing.md),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.md,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primaryBlueTonal,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.primaryBlue.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.swap_horiz_rounded, color: AppColors.primaryBlue, size: 20),
+                        const Icon(
+                          Icons.swap_horiz_rounded,
+                          color: AppColors.primaryBlue,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -266,7 +338,9 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
               data: (data) {
                 final courses = data.filteredCourses;
                 if (courses.isEmpty) {
-                  return AppEmptyState(onAction: data.hasActiveFilter ? _clearFilters : null);
+                  return AppEmptyState(
+                    onAction: data.hasActiveFilter ? _clearFilters : null,
+                  );
                 }
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(
@@ -276,11 +350,13 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
                     AppSpacing.bottomClearanceWithBar,
                   ),
                   itemCount: courses.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppSpacing.md),
                   itemBuilder: (context, i) => CourseStrategyCard(
                     course: courses[i],
                     variant: CourseCardVariant.catalog,
-                    onTap: () => _handleCourseTap(courses[i], data.replacingCourseCode),
+                    onTap: () =>
+                        _handleCourseTap(courses[i], data.replacingCourseCode),
                   ),
                 );
               },
@@ -313,7 +389,8 @@ class _EligibleFilterChip extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           side: BorderSide(
-            color: isSelected ? AppColors.successBorder : AppColors.borderStructural,
+            color:
+                isSelected ? AppColors.successBorder : AppColors.borderStructural,
             width: 1.0,
           ),
         ),
@@ -331,9 +408,12 @@ class _EligibleFilterChip extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isSelected ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded,
+                  isSelected
+                      ? Icons.check_circle_rounded
+                      : Icons.check_circle_outline_rounded,
                   size: 16,
-                  color: isSelected ? AppColors.successText : AppColors.textSecondary,
+                  color:
+                      isSelected ? AppColors.successText : AppColors.textSecondary,
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -341,7 +421,9 @@ class _EligibleFilterChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isSelected ? AppColors.successText : AppColors.textSecondary,
+                    color: isSelected
+                        ? AppColors.successText
+                        : AppColors.textSecondary,
                   ),
                 ),
               ],

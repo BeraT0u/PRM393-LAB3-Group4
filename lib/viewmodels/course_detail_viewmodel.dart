@@ -52,7 +52,8 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
 
   @override
   Future<CourseDetailState> build() async {
-    final course = await ref.read(courseServiceProvider).getCourseById(courseCode);
+    final course =
+        await ref.read(courseServiceProvider).getCourseById(courseCode);
     if (course == null) {
       throw StateError('Không tìm thấy môn học $courseCode');
     }
@@ -64,15 +65,18 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
       final studentService = ref.read(studentServiceProvider);
       final profile = await studentService.getStudentProfile(uid);
       final completed = await studentService.getCompletedCourses(uid);
-      final passed = {...profile.passedCourseCodes, ...completed.map((c) => c.code)};
+      final passed = {
+        ...profile.passedCourseCodes,
+        ...completed.map((c) => c.code),
+      };
       prerequisiteMet = passed.contains(prereq);
     }
 
     ref.read(analyticsServiceProvider).logViewCourseDetail(
-      courseId: course.code,
-      courseName: course.name,
-      credits: course.credits,
-    );
+          courseId: course.code,
+          courseName: course.name,
+          credits: course.credits,
+        );
 
     return CourseDetailState(
       course: course,
@@ -89,11 +93,12 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
   void selectTarget(GradeTargetOption target) {
     final current = state.value;
     if (current == null) return;
-    state = AsyncData(current.copyWith(target: target));
+    final nextState = current.copyWith(target: target);
+    state = AsyncData(nextState);
     ref.read(analyticsServiceProvider).logSelectGradeTarget(
           courseId: current.course.code,
           targetGrade: target.code,
-          estimatedHours: target.hoursFor(current.course),
+          estimatedHours: nextState.plannedHours,
         );
   }
 
@@ -104,7 +109,7 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
   }
 }
 
-final courseDetailViewModelProvider =
-    AsyncNotifierProvider.family<CourseDetailViewModel, CourseDetailState, String>(
+final courseDetailViewModelProvider = AsyncNotifierProvider.family<
+    CourseDetailViewModel, CourseDetailState, String>(
   CourseDetailViewModel.new,
 );

@@ -1,193 +1,187 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/student_profile_model.dart';
-import '../services/student_service.dart';
+import '../services/service_providers.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../viewmodels/completed_courses_viewmodel.dart';
+import '../widgets/widgets.dart';
 import 'edit_profile_screen.dart';
 
-class UserDetailProfileScreen extends StatefulWidget {
-  final StudentProfileModel profile;
+class UserDetailProfileScreen extends ConsumerStatefulWidget {
+  final StudentProfileModel initialProfile;
 
-  const UserDetailProfileScreen({
-    super.key,
-    required this.profile,
-  });
+  const UserDetailProfileScreen({super.key, required this.initialProfile});
 
   @override
-  State<UserDetailProfileScreen> createState() => _UserDetailProfileScreenState();
+  ConsumerState<UserDetailProfileScreen> createState() =>
+      _UserDetailProfileScreenState();
 }
 
-class _UserDetailProfileScreenState extends State<UserDetailProfileScreen> {
-  final _studentService = StudentService();
-  late StudentProfileModel _currentProfile;
-  bool _isLoading = false;
+class _UserDetailProfileScreenState
+    extends ConsumerState<UserDetailProfileScreen> {
+  late StudentProfileModel _profile;
 
   @override
   void initState() {
     super.initState();
-    _currentProfile = widget.profile;
+    _profile = widget.initialProfile;
   }
 
-  // Hàm tải lại dữ liệu hồ sơ mới nhất từ Firestore
-  Future<void> _refreshProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
+  Future<void> _navigateToEdit() async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfileScreen(profile: _profile),
+      ),
+    );
 
-    try {
-      final updatedProfile = await _studentService.getStudentProfile(
-        _currentProfile.uid,
-        email: _currentProfile.email,
-      );
-
-      setState(() {
-        _currentProfile = updatedProfile;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+    if (result == true && mounted) {
+      final updated = await ref
+          .read(studentServiceProvider)
+          .getStudentProfile(_profile.uid);
+      if (mounted) {
+        setState(() {
+          _profile = updated;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final completedAsync = ref.watch(completedCoursesViewModelProvider);
+    final activeProfile = completedAsync.value?.profile ?? _profile;
+    final hasHttpAvatar = activeProfile.avatarUrl != null &&
+        activeProfile.avatarUrl!.startsWith('http');
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Thông tin cá nhân'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Chỉnh sửa hồ sơ',
-            onPressed: () async {
-              // Đợi kết quả trả về từ EditProfileScreen
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditProfileScreen(profile: _currentProfile),
-                ),
-              );
-
-              // Nếu cập nhật thành công (EditProfileScreen pop về true), tải lại dữ liệu
-              if (result == true) {
-                _refreshProfile();
-              }
-            },
-          ),
-        ],
+      backgroundColor: AppColors.canvasBg,
+      appBar: const AppTopBar(
+        title: 'Chi Tiết Hồ Sơ',
+        subtitle: 'Thông tin cá nhân sinh viên',
+        showBack: true,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          children: [
+            const SizedBox(height: AppSpacing.md),
+            Center(
+              child: CircleAvatar(
+                radius: 56,
+                backgroundColor: AppColors.primaryBlueTonal,
+                backgroundImage:
+                    hasHttpAvatar ? NetworkImage(activeProfile.avatarUrl!) : null,
+                child: !hasHttpAvatar
+                    ? Text(
+                        activeProfile.avatarInitials,
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryBlue,
+                        ),
+                      )
+                    : null,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceCard,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.borderStructural),
+                boxShadow: AppElevation.softShadow,
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 16),
-                  // Avatar
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xFFFFF3E0),
-                    backgroundImage: _currentProfile.avatarUrl != null
-                        ? NetworkImage(_currentProfile.avatarUrl!)
-                        : null,
-                    child: _currentProfile.avatarUrl == null
-                        ? Text(
-                            _currentProfile.fullName.isNotEmpty
-                                ? _currentProfile.fullName[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFF9800),
-                            ),
-                          )
-                        : null,
+                  _buildInfoRow(theme, 'Họ và tên', activeProfile.fullName),
+                  const Divider(
+                    height: AppSpacing.xl,
+                    color: AppColors.borderStructural,
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _currentProfile.fullName,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  _buildInfoRow(theme, 'Mã sinh viên', activeProfile.studentId),
+                  const Divider(
+                    height: AppSpacing.xl,
+                    color: AppColors.borderStructural,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _currentProfile.studentId,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  _buildInfoRow(
+                    theme,
+                    'Email',
+                    activeProfile.email ?? 'Chưa cập nhật',
                   ),
-                  const SizedBox(height: 24),
-
-                  // Thẻ chi tiết thông tin
-                  Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          _buildDetailRow(
-                            icon: Icons.email_outlined,
-                            label: 'Email',
-                            value: _currentProfile.email ?? 'Chưa cập nhật',
-                          ),
-                          const Divider(),
-                          _buildDetailRow(
-                            icon: Icons.school_outlined,
-                            label: 'Ngành học',
-                            value: 'Kỹ thuật phần mềm',
-                          ),
-                          const Divider(),
-                          _buildDetailRow(
-                            icon: Icons.bookmark_outline,
-                            label: 'Tín chỉ tích lũy',
-                            value: '${_currentProfile.accumulatedCredits} / ${_currentProfile.totalGraduationCredits} TC',
-                          ),
-                          const Divider(),
-                          _buildDetailRow(
-                            icon: Icons.star_outline,
-                            label: 'GPA hiện tại',
-                            value: _currentProfile.currentGpa.toStringAsFixed(2),
-                          ),
-                          const Divider(),
-                          _buildDetailRow(
-                            icon: Icons.flag_outlined,
-                            label: 'GPA mục tiêu',
-                            value: _currentProfile.targetGpa.toStringAsFixed(2),
-                          ),
-                        ],
-                      ),
-                    ),
+                  const Divider(
+                    height: AppSpacing.xl,
+                    color: AppColors.borderStructural,
+                  ),
+                  _buildInfoRow(theme, 'Chuyên ngành', activeProfile.major),
+                  const Divider(
+                    height: AppSpacing.xl,
+                    color: AppColors.borderStructural,
+                  ),
+                  _buildInfoRow(theme, 'Khóa học', activeProfile.cohort),
+                  const Divider(
+                    height: AppSpacing.xl,
+                    color: AppColors.borderStructural,
+                  ),
+                  _buildInfoRow(
+                    theme,
+                    'GPA hiện tại / Mục tiêu',
+                    '${activeProfile.currentGpa.toStringAsFixed(2)} / ${activeProfile.targetGpa.toStringAsFixed(2)}',
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: AppSpacing.xxl),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: _navigateToEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text(
+                  'Chỉnh sửa hồ sơ',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildDetailRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF1976D2), size: 22),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
+  Widget _buildInfoRow(ThemeData theme, String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value.isNotEmpty ? value : 'Chưa cập nhật',
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

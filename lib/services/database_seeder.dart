@@ -149,6 +149,106 @@ class DatabaseSeeder {
       selectedGradeTarget: 'A',
       plannedSelfStudyHours: 5.0,
     ),
+    const CourseModel(
+      id: 'PRO192',
+      code: 'PRO192',
+      name: 'Lập trình Hướng đối tượng',
+      credits: 3,
+      difficulty: 3.0,
+      defaultSelfStudyHours: 6,
+      prerequisiteCode: null,
+      category: 'Cơ sở ngành',
+      assessmentBreakdown: {
+        'Thực hành (Lab)': 30,
+        'Bài kiểm tra (PE)': 40,
+        'Thi cuối kỳ (FE)': 30,
+      },
+      studyTips: [
+        'Nắm vững 4 tính chất OOP: Đóng gói, Kế thừa, Đa hình, Trừu tượng và luyện giải đề PE.',
+      ],
+      selectedGradeTarget: 'A',
+      plannedSelfStudyHours: 6.0,
+    ),
+    const CourseModel(
+      id: 'MAD101',
+      code: 'MAD101',
+      name: 'Toán Rời rạc',
+      credits: 3,
+      difficulty: 3.0,
+      defaultSelfStudyHours: 5,
+      prerequisiteCode: null,
+      category: 'Cơ sở ngành',
+      assessmentBreakdown: {
+        'Bài tập tuần': 30,
+        'Kiểm tra giữa kỳ': 30,
+        'Thi cuối kỳ (FE)': 40,
+      },
+      studyTips: [
+        'Tập trung ôn luyện Lý thuyết đồ thị, Cây khung nhỏ nhất và Quy nạp toán học.',
+      ],
+      selectedGradeTarget: 'A',
+      plannedSelfStudyHours: 5.0,
+    ),
+    const CourseModel(
+      id: 'CSD201',
+      code: 'CSD201',
+      name: 'Cấu trúc Dữ liệu & Giải thuật',
+      credits: 3,
+      difficulty: 4.0,
+      defaultSelfStudyHours: 7,
+      prerequisiteCode: 'PRO192',
+      category: 'Cơ sở ngành',
+      assessmentBreakdown: {
+        'Assignment': 30,
+        'Thi thực hành (PE)': 40,
+        'Thi cuối kỳ (FE)': 30,
+      },
+      studyTips: [
+        'Thực hành cài đặt Linked List, BST, AVL Tree và các thuật toán đồ thị Dijkstra, BFS/DFS.',
+      ],
+      selectedGradeTarget: 'A',
+      plannedSelfStudyHours: 7.0,
+    ),
+    const CourseModel(
+      id: 'MAS291',
+      code: 'MAS291',
+      name: 'Xác suất Thống kê',
+      credits: 3,
+      difficulty: 3.5,
+      defaultSelfStudyHours: 6,
+      prerequisiteCode: 'MAD101',
+      category: 'Cơ sở ngành',
+      assessmentBreakdown: {
+        'Quiz & Project': 30,
+        'Kiểm tra giữa kỳ': 30,
+        'Thi cuối kỳ (FE)': 40,
+      },
+      studyTips: [
+        'Hiểu bản chất phân phối chuẩn, kiểm định giả thuyết và hồi quy tuyến tính.',
+      ],
+      selectedGradeTarget: 'B',
+      plannedSelfStudyHours: 4.0,
+    ),
+    const CourseModel(
+      id: 'NWC203',
+      code: 'NWC203',
+      name: 'Mạng Máy tính',
+      credits: 3,
+      difficulty: 3.5,
+      defaultSelfStudyHours: 6,
+      prerequisiteCode: null,
+      category: 'Cơ sở ngành',
+      assessmentBreakdown: {
+        'Lab Packet Tracer': 30,
+        'Kiểm tra kỹ năng': 30,
+        'Thi cuối kỳ (FE)': 40,
+      },
+      studyTips: [
+        'Luyện tập chia Subnet IPv4/IPv6 và cấu hình định tuyến OSPF trên Cisco Packet Tracer.',
+      ],
+      selectedGradeTarget: 'A',
+      plannedSelfStudyHours: 6.0,
+    ),
   ];
 
   /// Hồ sơ Persona 1: Trần Hoàng Long (SE180504 - Tiêu chuẩn, kịch bản kế hoạch 34h -> 26h)
@@ -204,6 +304,18 @@ class DatabaseSeeder {
     syncGoogleCalendar: false,
     isNewStudent: false,
   );
+
+  /// Danh sách 3 hồ sơ sinh viên mẫu phục vụ chuyển đổi tài khoản trên SCR-01
+  static final List<StudentProfileModel> sampleStudents = [
+    defaultStudent,
+    personaLinh,
+    personaTuan,
+  ];
+
+  /// Tra cứu hồ sơ sinh viên theo UID (hỗ trợ cả 3 hồ sơ mẫu và tài khoản mới)
+  static StudentProfileModel getStudentByUid(String uid) {
+    return resolveProfileForUser(uid: uid);
+  }
 
   /// Khởi tạo hồ sơ rỗng cho tài khoản Google mới chưa định danh
   static StudentProfileModel getEmptyProfile(
@@ -277,6 +389,26 @@ class DatabaseSeeder {
     );
   }
 
+  /// Kế hoạch học tập rỗng (0 môn) để người dùng bắt đầu chọn môn thực tế từ đầu
+  static StudyPlanModel getEmptyPlan(
+    String userId, {
+    String semesterName = 'Fall 2024',
+    double maxSafeThresholdHours = 25.0,
+    double targetGpa = 3.65,
+  }) {
+    return StudyPlanModel(
+      id: '${userId}_${semesterName.replaceAll(' ', '')}',
+      userId: userId,
+      semesterName: semesterName,
+      selectedCourses: const [],
+      maxSafeThresholdHours: maxSafeThresholdHours,
+      targetGpa: targetGpa,
+      tuitionFee: 0,
+      isSaved: false,
+      updatedAt: DateTime.now(),
+    );
+  }
+
   /// Kế hoạch học tập ban đầu (Trạng thái XUNG ĐỘT QUÁ TẢI 34h: PRM393, SWE302, AIE411, IAE201)
   static StudyPlanModel getInitialConflictPlan(String userId) {
     final conflictCourses = [
@@ -306,7 +438,7 @@ class DatabaseSeeder {
       sampleCourses.firstWhere((c) => c.code == 'SWE302'),
       sampleCourses.firstWhere((c) => c.code == 'AIE411'),
       sampleCourses.firstWhere((c) => c.code == 'PRM323'), // Đổi sang môn này (4h)
-      sampleCourses.firstWhere((c) => c.code == 'OSG209'), // Thêm môn (4h)
+      sampleCourses.firstWhere((c) => c.code == 'OSG209').copyWith(plannedSelfStudyHours: 0.0),
     ];
 
     return StudyPlanModel(
