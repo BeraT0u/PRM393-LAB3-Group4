@@ -2,13 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:eduplan/models/course_model.dart';
 import 'package:eduplan/services/database_seeder.dart';
-import 'package:eduplan/screens/course_catalog_screen.dart';
 import 'package:eduplan/screens/course_detail_screen.dart';
 import 'package:eduplan/screens/plan_analyzer_screen.dart';
 import 'package:eduplan/screens/selected_courses_screen.dart';
 import 'package:eduplan/theme/app_theme.dart';
+import 'package:eduplan/viewmodels/plan_analyzer_viewmodel.dart';
 import 'package:eduplan/widgets/widgets.dart';
 
 void main() {
@@ -175,9 +174,13 @@ void main() {
 
     testWidgets('5. PlanAnalyzerScreen & Workload Meter có Semantics container giải thích rõ ràng', (tester) async {
       final handle = tester.ensureSemantics();
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(planAnalyzerViewModelProvider.notifier).loadSampleConflictPlan();
 
       await tester.pumpWidget(
-        ProviderScope(
+        UncontrolledProviderScope(
+          container: container,
           child: MaterialApp(
             theme: AppTheme.warmPaperTheme,
             home: const PlanAnalyzerScreen(),
@@ -205,9 +208,13 @@ void main() {
 
     testWidgets('6. SelectedCoursesScreen có Semantics cho nút lưu và các hành động', (tester) async {
       final handle = tester.ensureSemantics();
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      container.read(planAnalyzerViewModelProvider.notifier).loadSampleConflictPlan();
 
       await tester.pumpWidget(
-        ProviderScope(
+        UncontrolledProviderScope(
+          container: container,
           child: MaterialApp(
             theme: AppTheme.warmPaperTheme,
             home: const SelectedCoursesScreen(),

@@ -9,8 +9,8 @@ import 'screens/login_screen.dart';
 import 'screens/plan_analyzer_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/selected_courses_screen.dart';
+import 'screens/semester_summary_screen.dart';
 import 'theme/app_theme.dart';
-import 'widgets/main_scaffold.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,15 +48,7 @@ class EduPlanApp extends StatelessWidget {
         '/plan-analyzer': (context) => const PlanAnalyzerScreen(),
         '/selected-courses': (context) => const SelectedCoursesScreen(),
         '/profile': (context) => const ProfileScreen(),
-        '/summary': (context) => const MainScaffold(
-              currentTabIndex: 0,
-              appBar: AppTopBar(
-                title: 'Tổng Kết Kế Hoạch',
-                subtitle: 'Fall 2024 • Kế hoạch học tập',
-                showBack: true,
-              ),
-              body: Center(child: Text('SCR-07: Tổng Kết Kế Hoạch Kỳ (Nhóm 5)')),
-            ),
+        '/summary': (context) => const SemesterSummaryScreen(),
       },
     );
   }

@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:eduplan/models/course_model.dart';
 import 'package:eduplan/screens/course_catalog_screen.dart';
 import 'package:eduplan/services/analytics_service.dart';
 import 'package:eduplan/services/service_providers.dart';
@@ -224,7 +222,8 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      // Đọc ViewModel kích hoạt build()
+      // Nạp tổ hợp 4 môn xung đột (34h)
+      container.read(planAnalyzerViewModelProvider.notifier).loadSampleConflictPlan();
       final state = container.read(planAnalyzerViewModelProvider);
       expect(state.hasConflict, isTrue);
       expect(state.totalHours, equals(34.0));

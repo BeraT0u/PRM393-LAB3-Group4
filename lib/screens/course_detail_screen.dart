@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../utils/grade_target.dart';
+import '../viewmodels/course_catalog_viewmodel.dart';
 import '../viewmodels/course_detail_viewmodel.dart';
+import '../viewmodels/plan_analyzer_viewmodel.dart';
 import '../widgets/widgets.dart';
 
 /// UC-16 → UC-19: SCR-05 — Course Strategy, Assessment & Study Tips.
@@ -11,8 +13,13 @@ import '../widgets/widgets.dart';
 /// - Nhận mã môn qua `Navigator.pushNamed('/course-detail', arguments: 'PRM393')`.
 class CourseDetailScreen extends ConsumerWidget {
   final String courseCode;
+  final String? replacingCourseCode;
 
-  const CourseDetailScreen({super.key, required this.courseCode});
+  const CourseDetailScreen({
+    super.key,
+    required this.courseCode,
+    this.replacingCourseCode,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -32,8 +39,12 @@ class CourseDetailScreen extends ConsumerWidget {
             IconButton(
               tooltip: state.isFavorite ? 'Bỏ ghim môn' : 'Ghim môn',
               icon: Icon(
-                state.isFavorite ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                color: state.isFavorite ? AppColors.primaryBlue : AppColors.textSecondary,
+                state.isFavorite
+                    ? Icons.push_pin_rounded
+                    : Icons.push_pin_outlined,
+                color: state.isFavorite
+                    ? AppColors.primaryBlue
+                    : AppColors.textSecondary,
               ),
               onPressed: vm.toggleFavorite,
             ),
@@ -45,9 +56,28 @@ class CourseDetailScreen extends ConsumerWidget {
               isFavorite: state.isFavorite,
               onFavorite: vm.toggleFavorite,
               onAddToPlan: () {
+                final planned = state.plannedCourse;
+                if (replacingCourseCode != null) {
+                  ref
+                      .read(planAnalyzerViewModelProvider.notifier)
+                      .replaceConflictCourse(
+                        replacement: planned,
+                        targetCodeToReplace: replacingCourseCode,
+                      );
+                  ref
+                      .read(courseCatalogViewModelProvider.notifier)
+                      .setOnlyEligible(
+                        false,
+                        replacingCourseCode: null,
+                      );
+                } else {
+                  ref
+                      .read(planAnalyzerViewModelProvider.notifier)
+                      .applyIncomingCourse(planned);
+                }
                 Navigator.of(context).pushNamed(
                   '/plan-analyzer',
-                  arguments: state.plannedCourse,
+                  arguments: planned,
                 );
               },
             ),
@@ -61,7 +91,8 @@ class CourseDetailScreen extends ConsumerWidget {
           message: 'Không thể tải thông tin môn $courseCode. Vui lòng thử lại.',
           onRetry: vm.reload,
         ),
-        data: (data) => _DetailBody(state: data, onSelectTarget: vm.selectTarget),
+        data: (data) =>
+            _DetailBody(state: data, onSelectTarget: vm.selectTarget),
       ),
     );
   }
@@ -101,7 +132,10 @@ class _DetailBody extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: [
-              StatusBadge(label: '${course.credits} Tín chỉ', type: StatusBadgeType.neutral),
+              StatusBadge(
+                label: '${course.credits} Tín chỉ',
+                type: StatusBadgeType.neutral,
+              ),
               StatusBadge(
                 label: 'Độ khó: ${_difficulty(course.difficulty)}/5 ⭐',
                 type: StatusBadgeType.warning,
@@ -113,13 +147,18 @@ class _DetailBody extends StatelessWidget {
           // UC-17: Cấu trúc điểm
           if (course.assessmentBreakdown.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xl),
-            Text('📊 Cấu trúc điểm & Đánh giá', style: theme.textTheme.titleMedium),
+            Text(
+              '📊 Cấu trúc điểm & Đánh giá',
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: AppSpacing.md),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 for (final e in course.assessmentBreakdown.entries) ...[
-                  Expanded(child: _AssessmentBox(label: e.key, percent: e.value)),
+                  Expanded(
+                    child: _AssessmentBox(label: e.key, percent: e.value),
+                  ),
                   if (e.key != course.assessmentBreakdown.keys.last)
                     const SizedBox(width: AppSpacing.sm),
                 ],
@@ -130,14 +169,20 @@ class _DetailBody extends StatelessWidget {
           // UC-17: Tips học tập
           if (course.studyTips.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.xl),
-            Text('💡 Tips học tập từ Khóa trên', style: theme.textTheme.titleMedium),
+            Text(
+              '💡 Tips học tập từ Khóa trên',
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: AppSpacing.md),
             _TipsCard(tips: course.studyTips),
           ],
 
           // UC-18: Chọn mục tiêu & khối lượng
           const SizedBox(height: AppSpacing.xl),
-          Text('🎯 Chọn Mục tiêu & Khối lượng', style: theme.textTheme.titleMedium),
+          Text(
+            '🎯 Chọn Mục tiêu & Khối lượng',
+            style: theme.textTheme.titleMedium,
+          ),
           const SizedBox(height: AppSpacing.md),
           Semantics(
             container: true,
@@ -172,11 +217,20 @@ class _DetailBody extends StatelessWidget {
   Widget _prerequisiteBadge() {
     final prereq = state.prerequisiteCode;
     if (prereq == null) {
-      return const StatusBadge(label: 'Không có tiên quyết', type: StatusBadgeType.neutral);
+      return const StatusBadge(
+        label: 'Không có tiên quyết',
+        type: StatusBadgeType.neutral,
+      );
     }
     return state.prerequisiteMet
-        ? StatusBadge(label: 'Tiên quyết: $prereq ✅', type: StatusBadgeType.success)
-        : StatusBadge(label: 'Tiên quyết: $prereq ❌ chưa học', type: StatusBadgeType.danger);
+        ? StatusBadge(
+            label: 'Tiên quyết: $prereq ✅',
+            type: StatusBadgeType.success,
+          )
+        : StatusBadge(
+            label: 'Tiên quyết: $prereq ❌ chưa học',
+            type: StatusBadgeType.danger,
+          );
   }
 
   static String _difficulty(double d) =>
@@ -196,7 +250,10 @@ class _AssessmentBox extends StatelessWidget {
       container: true,
       label: '$label $percent phần trăm',
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md, horizontal: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.md,
+          horizontal: AppSpacing.sm,
+        ),
         decoration: BoxDecoration(
           color: AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(AppRadius.control),
@@ -217,7 +274,9 @@ class _AssessmentBox extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ),
@@ -249,7 +308,10 @@ class _TipsCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('• ', style: TextStyle(color: AppColors.warningText, fontSize: 14)),
+                const Text(
+                  '• ',
+                  style: TextStyle(color: AppColors.warningText, fontSize: 14),
+                ),
                 Expanded(
                   child: Text(
                     tips[i],
@@ -291,9 +353,12 @@ class _GradeTargetCard extends StatelessWidget {
       inMutuallyExclusiveGroup: true,
       checked: selected,
       button: true,
-      label: 'Mục tiêu ${option.title} ${option.threshold}, đầu tư $hoursLabel mỗi tuần',
+      label:
+          'Mục tiêu ${option.title} ${option.threshold}, đầu tư $hoursLabel mỗi tuần',
       child: Material(
-        color: selected ? AppColors.primaryBlueTonal.withValues(alpha: 0.45) : AppColors.surfaceCard,
+        color: selected
+            ? AppColors.primaryBlueTonal.withValues(alpha: 0.45)
+            : AppColors.surfaceCard,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
           side: BorderSide(
@@ -305,13 +370,19 @@ class _GradeTargetCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadius.card),
           onTap: onTap,
           child: Container(
-            constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
+            ),
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
               children: [
                 Icon(
-                  selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                  color: selected ? AppColors.primaryBlue : AppColors.textSecondary,
+                  selected
+                      ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: selected
+                      ? AppColors.primaryBlue
+                      : AppColors.textSecondary,
                 ),
                 const SizedBox(width: AppSpacing.md),
                 Expanded(
@@ -320,12 +391,16 @@ class _GradeTargetCard extends StatelessWidget {
                     children: [
                       Text(
                         'Mục tiêu: ${option.title} (${option.threshold})',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         'Đầu tư $hoursLabel/tuần • ${option.note}',
-                        style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -367,7 +442,9 @@ class _ActionFooter extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 backgroundColor: AppColors.surfaceCard,
                 side: BorderSide(
-                  color: isFavorite ? AppColors.dangerBorder : AppColors.borderStructural,
+                  color: isFavorite
+                      ? AppColors.dangerBorder
+                      : AppColors.borderStructural,
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.control),
@@ -375,8 +452,12 @@ class _ActionFooter extends StatelessWidget {
               ),
               onPressed: onFavorite,
               child: Icon(
-                isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: isFavorite ? AppColors.dangerBorder : AppColors.textSecondary,
+                isFavorite
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
+                color: isFavorite
+                    ? AppColors.dangerBorder
+                    : AppColors.textSecondary,
               ),
             ),
           ),

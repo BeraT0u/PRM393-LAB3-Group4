@@ -6,12 +6,25 @@ import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
 import '../utils/app_logger.dart';
 import '../utils/completed_course_rules.dart';
+import 'course_catalog_viewmodel.dart';
+import 'plan_analyzer_viewmodel.dart';
 
-/// UID sinh viên đang đăng nhập.
-/// TODO(UC-09): thay bằng uid thật từ Google Sign-In / Persona khi hoàn tất đăng nhập.
-final currentStudentUidProvider = Provider<String>((ref) {
-  return DatabaseSeeder.defaultStudent.uid;
-});
+/// Quản lý UID sinh viên đang đăng nhập (mặc định Persona 1, hỗ trợ chuyển đổi đa tài khoản / tài khoản mới).
+class CurrentStudentUidNotifier extends Notifier<String> {
+  @override
+  String build() => DatabaseSeeder.defaultStudent.uid;
+
+  void setUid(String uid) {
+    if (state != uid) {
+      state = uid;
+    }
+  }
+}
+
+final currentStudentUidProvider =
+    NotifierProvider<CurrentStudentUidNotifier, String>(
+  CurrentStudentUidNotifier.new,
+);
 
 /// Trạng thái dữ liệu của SCR-03 (Môn Đã Học).
 class CompletedCoursesState {
@@ -32,12 +45,18 @@ class CompletedCoursesState {
     this.selectedFilter = filterAll,
   });
 
-  CompletedCoursesState copyWith({String? selectedFilter}) {
+  CompletedCoursesState copyWith({
+    StudentProfileModel? profile,
+    List<CompletedCourseModel>? completed,
+    Set<String>? legacyPassedCodes,
+    List<CourseModel>? catalog,
+    String? selectedFilter,
+  }) {
     return CompletedCoursesState(
-      profile: profile,
-      completed: completed,
-      legacyPassedCodes: legacyPassedCodes,
-      catalog: catalog,
+      profile: profile ?? this.profile,
+      completed: completed ?? this.completed,
+      legacyPassedCodes: legacyPassedCodes ?? this.legacyPassedCodes,
+      catalog: catalog ?? this.catalog,
       selectedFilter: selectedFilter ?? this.selectedFilter,
     );
   }
@@ -121,18 +140,21 @@ class CompletedCoursesState {
   }
 }
 
-/// UC-13 / UC-13B: ViewModel của SCR-03 (Môn Đã Học).
+/// UC-13 / UC-13B: ViewModel của SCR-03 (Môn Đã Học) & Hồ sơ học tập sinh viên.
 class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
   @override
-  Future<CompletedCoursesState> build() => _load();
+  Future<CompletedCoursesState> build() {
+    final uid = ref.watch(currentStudentUidProvider);
+    return _load(uid: uid);
+  }
 
-  Future<CompletedCoursesState> _load({String? filter}) async {
-    final uid = ref.read(currentStudentUidProvider);
+  Future<CompletedCoursesState> _load({String? uid, String? filter}) async {
+    final String activeUid = uid ?? ref.read(currentStudentUidProvider);
     final studentService = ref.read(studentServiceProvider);
     final courseService = ref.read(courseServiceProvider);
 
-    final profile = await studentService.getStudentProfile(uid);
-    final completed = await studentService.getCompletedCourses(uid);
+    final profile = await studentService.getStudentProfile(activeUid);
+    final completed = await studentService.getCompletedCourses(activeUid);
     final catalog = await courseService.getCourses();
 
     final completedCodes = completed.map((c) => c.code).toSet();
@@ -195,13 +217,71 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
             grade: grade!,
           );
       final filter = state.value?.selectedFilter;
-      state = AsyncData(await _load(filter: filter));
+      final updatedState = await _load(uid: uid, filter: filter);
+      state = AsyncData(updatedState);
+
+      // Đồng bộ danh sách môn đã học sang CourseCatalog và PlanAnalyzer
+      ref.read(planAnalyzerViewModelProvider.notifier).syncPassedCourses(
+            updatedState.passedCodes.toList(),
+          );
+      ref.invalidate(courseCatalogViewModelProvider);
       return null;
     } on ArgumentError catch (e) {
       return e.message?.toString() ?? 'Dữ liệu không hợp lệ.';
     } catch (e, st) {
       AppLogger.error('Lỗi khi thêm môn đã học ${course.code}', e, st);
       return 'Không thể lưu môn học. Vui lòng thử lại.';
+    }
+  }
+
+  /// Cập nhật thông tin cá nhân của sinh viên (từ SCR-08 Profile Settings)
+  Future<void> updatePersonalInfo({
+    required String fullName,
+    required String studentId,
+    String? email,
+    String? avatarUrl,
+    double? currentGpa,
+    double? targetGpa,
+    int? totalGraduationCredits,
+  }) async {
+    final uid = ref.read(currentStudentUidProvider);
+    final updatedProfile = await ref.read(studentServiceProvider).updatePersonalInfo(
+          uid: uid,
+          fullName: fullName,
+          studentId: studentId,
+          email: email,
+          avatarUrl: avatarUrl,
+          currentGpa: currentGpa,
+          targetGpa: targetGpa,
+          totalGraduationCredits: totalGraduationCredits,
+        );
+
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(profile: updatedProfile));
+    } else {
+      state = AsyncData(await _load(uid: uid));
+    }
+  }
+
+  /// Cập nhật công tắc cài đặt trên SCR-08
+  Future<void> updateSettings({
+    bool? notifyLabDeadlines,
+    bool? notificationEnabled,
+    bool? autoWarnWorkload,
+    bool? syncGoogleCalendar,
+    bool? calendarSyncEnabled,
+  }) async {
+    final uid = ref.read(currentStudentUidProvider);
+    final updatedProfile = await ref.read(studentServiceProvider).updateSettings(
+          uid: uid,
+          notifyLabDeadlines: notifyLabDeadlines ?? notificationEnabled,
+          autoWarnWorkload: autoWarnWorkload,
+          syncGoogleCalendar: syncGoogleCalendar ?? calendarSyncEnabled,
+        );
+    final current = state.value;
+    if (current != null) {
+      state = AsyncData(current.copyWith(profile: updatedProfile));
     }
   }
 }

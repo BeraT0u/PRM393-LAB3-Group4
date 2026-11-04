@@ -3,6 +3,7 @@ import '../models/course_model.dart';
 import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
 import '../utils/course_filter.dart';
+import 'completed_courses_viewmodel.dart';
 
 /// Trạng thái dữ liệu của SCR-04 (Course Catalog).
 class CourseCatalogState {
@@ -29,6 +30,7 @@ class CourseCatalogState {
     String? category,
     bool? onlyEligible,
     String? replacingCourseCode,
+    bool clearReplacingCourseCode = false,
   }) {
     return CourseCatalogState(
       allCourses: allCourses ?? this.allCourses,
@@ -36,7 +38,9 @@ class CourseCatalogState {
       query: query ?? this.query,
       category: category ?? this.category,
       onlyEligible: onlyEligible ?? this.onlyEligible,
-      replacingCourseCode: replacingCourseCode ?? this.replacingCourseCode,
+      replacingCourseCode: clearReplacingCourseCode
+          ? null
+          : (replacingCourseCode ?? this.replacingCourseCode),
     );
   }
 
@@ -60,15 +64,18 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
   String? _pendingReplacingCode;
 
   @override
-  Future<CourseCatalogState> build() => _load();
+  Future<CourseCatalogState> build() {
+    final uid = ref.watch(currentStudentUidProvider);
+    return _load(uid);
+  }
 
-  Future<CourseCatalogState> _load() async {
+  Future<CourseCatalogState> _load(String uid) async {
     final courses = await ref.read(courseServiceProvider).getCourses();
-    List<String> passed = DatabaseSeeder.defaultStudent.passedCourseCodes;
+    List<String> passed = DatabaseSeeder.getStudentByUid(uid).passedCourseCodes;
     try {
       final studentService = ref.read(studentServiceProvider);
-      final profile = await studentService.getStudentProfile(DatabaseSeeder.defaultStudent.uid);
-      final completed = await studentService.getCompletedCourses(DatabaseSeeder.defaultStudent.uid);
+      final profile = await studentService.getStudentProfile(uid);
+      final completed = await studentService.getCompletedCourses(uid);
       passed = {...profile.passedCourseCodes, ...completed.map((c) => c.code)}.toList();
     } catch (_) {
       // Offline fallback
@@ -83,14 +90,16 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
   }
 
   Future<void> reload() async {
+    final uid = ref.read(currentStudentUidProvider);
     state = const AsyncLoading();
-    state = await AsyncValue.guard(_load);
+    state = await AsyncValue.guard(() => _load(uid));
   }
 
   void setQuery(String query) {
     final current = state.value;
     if (current == null) return;
-    state = AsyncData(current.copyWith(query: query));
+    final nextState = current.copyWith(query: query);
+    state = AsyncData(nextState);
   }
 
   void setCategory(String category) {
@@ -105,7 +114,13 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
     if (current == null) return;
     final next = !current.onlyEligible;
     _pendingOnlyEligible = next;
-    state = AsyncData(current.copyWith(onlyEligible: next));
+    if (!next) {
+      _pendingReplacingCode = null;
+    }
+    state = AsyncData(current.copyWith(
+      onlyEligible: next,
+      clearReplacingCourseCode: !next,
+    ));
   }
 
   /// Cấu hình trực tiếp trạng thái filter môn đã xong tiên quyết (dùng khi vào từ [⇄ Đổi môn khác])
@@ -117,6 +132,7 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
       state = AsyncData(current.copyWith(
         onlyEligible: value,
         replacingCourseCode: replacingCourseCode,
+        clearReplacingCourseCode: replacingCourseCode == null,
       ));
     }
   }
@@ -131,6 +147,7 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
       query: '',
       category: CourseFilter.categoryAll,
       onlyEligible: false,
+      clearReplacingCourseCode: true,
     ));
   }
 }

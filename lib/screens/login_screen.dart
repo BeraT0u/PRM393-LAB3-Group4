@@ -1,29 +1,21 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-
+import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
+import '../viewmodels/completed_courses_viewmodel.dart';
 
 /// UC-08: SCR-01 — Login Screen & SCR-01_Loading
-/// Đặc tả kỹ thuật:
-/// - Layout: Scaffold(backgroundColor: AppColors.canvasBg) → SafeArea → Padding(16)
-///   → Column(mainAxisAlignment: MainAxisAlignment.spaceBetween). Không cuộn.
-/// - Components:
-///   + Logo EduPlan Master (sổ tay gáy xanh, 64×64 dp).
-///   + Khối tiêu đề: "EduPlan" (28sp bold) + Slogan "Lên lịch học thật dễ!".
-///   + Nút GoogleSignInButton: Chiều cao 52 dp, nền #FFFFFF, viền #EAE1D0, bo góc 8-12dp, logo Google SVG.
-/// - States:
-///   + Default: Sẵn sàng tương tác ("Đăng nhập bằng Google").
-///   + SCR-01_Loading: Khi bấm, nút hiển thị spinner CircularProgressIndicator(strokeWidth: 2.5)
-///     kèm text "Đang xác thực Google...".
+/// Hỗ trợ đăng nhập nhanh với tài khoản hiện tại hoặc chọn tài khoản mẫu / tạo tài khoản sinh viên mới (0 TC).
 class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback? onSignInSuccess;
 
-  const LoginScreen({super.key, this.onSignInSuccess});
+  const LoginScreen({
+    super.key,
+    this.onSignInSuccess,
+  });
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -31,6 +23,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
+  late String _selectedUid;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedUid = ref.read(currentStudentUidProvider);
+  }
 
   static const String _googleLogoSvg = '''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
@@ -45,62 +44,155 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
+    ref.read(currentStudentUidProvider.notifier).setUid(_selectedUid);
+    ref.read(analyticsServiceProvider).logLogin(method: 'google');
+    ref.read(analyticsServiceProvider).setUserId(_selectedUid);
+
     // Chuyển sang trạng thái SCR-01_Loading (delay 800ms theo đặc tả handoff)
     await Future.delayed(const Duration(milliseconds: 800));
-    try {
-      // 1. Mở màn hình chọn tài khoản Google
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
 
-      if (googleUser == null) {
-        // Người dùng bấm hủy
-        setState(() => _isLoading = false);
-        return;
-      }
+    if (!mounted) return;
+    setState(() => _isLoading = false);
 
-      // 2. Lấy authentication từ Google
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // 3. Tạo credential cho Firebase
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // 4. Đăng nhập vào Firebase
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(
-        credential,
-      );
-      
-      final analytics = ref.read(analyticsServiceProvider);
-      final uid = userCredential.user?.uid;
-      if (uid != null) await analytics.setUserId(uid);
-      await analytics.logLogin(method: 'google');
-
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-
-      if (widget.onSignInSuccess != null) {
-        widget.onSignInSuccess!();
-      } else {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      // Hiển thị thông báo lỗi
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đăng nhập thất bại: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (widget.onSignInSuccess != null) {
+      widget.onSignInSuccess!();
+    } else {
+      Navigator.pushReplacementNamed(context, '/home');
     }
+  }
+
+  void _showAccountPickerSheet() {
+    final customEmailCtrl = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+      ),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chọn tài khoản Google (FPT Edu)',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Chọn 1 trong 3 hồ sơ mẫu hoặc nhập email mới để trải nghiệm tài khoản 0 TC:',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                for (final student in DatabaseSeeder.sampleStudents)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.primaryBlueTonal,
+                      child: Text(
+                        student.avatarInitials,
+                        style: const TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      '${student.fullName} (${student.studentId})',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                    subtitle: Text(
+                      'Tích lũy: ${student.accumulatedCredits} TC • GPA: ${student.currentGpa.toStringAsFixed(2)}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: _selectedUid == student.uid
+                        ? const Icon(
+                            Icons.check_circle_rounded,
+                            color: AppColors.primaryBlue,
+                          )
+                        : null,
+                    onTap: () {
+                      setState(() => _selectedUid = student.uid);
+                      ref
+                          .read(currentStudentUidProvider.notifier)
+                          .setUid(student.uid);
+                      Navigator.of(sheetCtx).pop();
+                    },
+                  ),
+                const Divider(height: AppSpacing.xl),
+                const Text(
+                  'Hoặc đăng nhập bằng tài khoản sinh viên mới (0 TC, 0 môn):',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: customEmailCtrl,
+                        decoration: const InputDecoration(
+                          hintText: 'VD: anhntse190888@fpt.edu.vn',
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryBlue,
+                        foregroundColor: AppColors.onPrimaryWhite,
+                      ),
+                      onPressed: () {
+                        final raw = customEmailCtrl.text.trim().toLowerCase();
+                        final prefix = raw.isEmpty
+                            ? 'new_${DateTime.now().millisecondsSinceEpoch % 10000}'
+                            : raw.split('@').first.replaceAll(
+                                  RegExp(r'[^a-z0-9_]'),
+                                  '',
+                                );
+                        final newUid = 'student_new_$prefix';
+                        setState(() => _selectedUid = newUid);
+                        ref
+                            .read(currentStudentUidProvider.notifier)
+                            .setUid(newUid);
+                        Navigator.of(sheetCtx).pop();
+                      },
+                      child: const Text('Chọn mới'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final selectedProfile = DatabaseSeeder.getStudentByUid(_selectedUid);
 
     return Scaffold(
       backgroundColor: AppColors.canvasBg,
@@ -147,7 +239,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.xl,
-                      vertical: 36,
+                      vertical: 32,
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceCard,
@@ -257,8 +349,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               style: OutlinedButton.styleFrom(
                                 backgroundColor: AppColors.surfaceLowest,
                                 foregroundColor: AppColors.textPrimary,
-                                disabledBackgroundColor:
-                                    AppColors.surfaceLowest,
+                                disabledBackgroundColor: AppColors.surfaceLowest,
                                 side: const BorderSide(
                                   color: AppColors.borderStructural,
                                   width: 1.0,
@@ -270,9 +361,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   horizontal: AppSpacing.lg,
                                 ),
                               ),
-                              onPressed: _isLoading
-                                  ? null
-                                  : _handleGoogleSignIn,
+                              onPressed:
+                                  _isLoading ? null : _handleGoogleSignIn,
                               child: _isLoading
                                   ? const Row(
                                       mainAxisAlignment:
@@ -320,14 +410,33 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                             maxLines: 1,
                                             style: theme.textTheme.labelLarge
                                                 ?.copyWith(
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: AppColors.textPrimary,
-                                                ),
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                              color: AppColors.textPrimary,
+                                            ),
                                           ),
                                         ),
                                       ],
                                     ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+
+                        // Tuỳ chọn đổi tài khoản mẫu / tạo tài khoản sinh viên mới
+                        TextButton.icon(
+                          onPressed: _isLoading ? null : _showAccountPickerSheet,
+                          icon: const Icon(
+                            Icons.switch_account_outlined,
+                            size: 16,
+                            color: AppColors.primaryBlue,
+                          ),
+                          label: Text(
+                            'Tài khoản: ${selectedProfile.fullName} (${selectedProfile.studentId}) • Đổi',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primaryBlue,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),

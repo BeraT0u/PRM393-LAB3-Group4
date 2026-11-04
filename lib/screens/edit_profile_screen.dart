@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/student_profile_model.dart';
-import '../services/student_service.dart';
+import '../services/service_providers.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../viewmodels/completed_courses_viewmodel.dart';
+import '../widgets/widgets.dart';
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   final StudentProfileModel profile;
 
-  const EditProfileScreen({
-    super.key,
-    required this.profile,
-  });
+  const EditProfileScreen({super.key, required this.profile});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _studentService = StudentService();
 
-  late TextEditingController _fullNameController;
+  late TextEditingController _nameController;
   late TextEditingController _studentIdController;
+  late TextEditingController _majorController;
+  late TextEditingController _cohortController;
   late TextEditingController _targetGpaController;
 
   bool _isSaving = false;
@@ -27,16 +30,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _fullNameController = TextEditingController(text: widget.profile.fullName);
-    _studentIdController = TextEditingController(text: widget.profile.studentId);
-    _targetGpaController =
-        TextEditingController(text: widget.profile.targetGpa.toString());
+    _nameController = TextEditingController(text: widget.profile.fullName);
+    _studentIdController = TextEditingController(
+      text: widget.profile.studentId,
+    );
+    _majorController = TextEditingController(text: widget.profile.major);
+    _cohortController = TextEditingController(text: widget.profile.cohort);
+    _targetGpaController = TextEditingController(
+      text: widget.profile.targetGpa.toStringAsFixed(2),
+    );
   }
 
   @override
   void dispose() {
-    _fullNameController.dispose();
+    _nameController.dispose();
     _studentIdController.dispose();
+    _majorController.dispose();
+    _cohortController.dispose();
     _targetGpaController.dispose();
     super.dispose();
   }
@@ -44,168 +54,183 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isSaving = true;
-    });
+    setState(() => _isSaving = true);
 
     try {
-      final double? parsedGpa = double.tryParse(_targetGpaController.text.trim());
+      final studentService = ref.read(studentServiceProvider);
+      final fullName = _nameController.text.trim();
+      final studentId = _studentIdController.text.trim();
+      final major = _majorController.text.trim();
+      final cohort = _cohortController.text.trim();
+      final targetGpa =
+          double.tryParse(_targetGpaController.text.trim()) ??
+              widget.profile.targetGpa;
 
-      await _studentService.updatePersonalInfo(
-        uid: widget.profile.uid,
-        fullName: _fullNameController.text.trim(),
-        studentId: _studentIdController.text.trim(),
-        targetGpa: parsedGpa,
+      final words = fullName.split(RegExp(r'\s+'));
+      final avatarInitials = words.length >= 2
+          ? '${words[words.length - 2][0]}${words.last[0]}'.toUpperCase()
+          : fullName
+              .substring(0, fullName.length >= 2 ? 2 : 1)
+              .toUpperCase();
+
+      final updatedProfile = widget.profile.copyWith(
+        fullName: fullName,
+        studentId: studentId,
+        major: major,
+        cohort: cohort,
+        targetGpa: targetGpa.clamp(0.0, 4.0),
+        avatarUrl: avatarInitials,
+        isNewStudent: false,
       );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cập nhật hồ sơ thành công!'),
-            backgroundColor: Color(0xFF4CAF50),
-          ),
-        );
-        // Trở về màn hình trước đó và đóng màn hình edit
-        Navigator.pop(context, true);
-      }
+      await studentService.updateProfile(updatedProfile);
+      await ref
+          .read(completedCoursesViewModelProvider.notifier)
+          .updatePersonalInfo(
+            fullName: fullName,
+            studentId: studentId,
+            avatarUrl: avatarInitials,
+            targetGpa: targetGpa.clamp(0.0, 4.0),
+          );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cập nhật hồ sơ thành công!'),
+          backgroundColor: AppColors.successText,
+        ),
+      );
+      Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi khi lưu hồ sơ: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi cập nhật: $e'),
+          backgroundColor: AppColors.dangerText,
+        ),
+      );
     } finally {
       if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
+        setState(() => _isSaving = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasHttpAvatar = widget.profile.avatarUrl != null &&
+        widget.profile.avatarUrl!.startsWith('http');
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Chỉnh sửa thông tin'),
-        elevation: 0,
+      backgroundColor: AppColors.canvasBg,
+      appBar: const AppTopBar(
+        title: 'Chỉnh Sửa Hồ Sơ',
+        subtitle: 'Cập nhật thông tin cá nhân',
+        showBack: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(AppSpacing.lg),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar xem trước
+              const SizedBox(height: AppSpacing.md),
               Center(
                 child: CircleAvatar(
-                  radius: 44,
-                  backgroundColor: const Color(0xFFFFF3E0),
-                  backgroundImage: widget.profile.avatarUrl != null
-                      ? NetworkImage(widget.profile.avatarUrl!)
-                      : null,
-                  child: widget.profile.avatarUrl == null
+                  radius: 56,
+                  backgroundColor: AppColors.primaryBlueTonal,
+                  backgroundImage:
+                      hasHttpAvatar ? NetworkImage(widget.profile.avatarUrl!) : null,
+                  child: !hasHttpAvatar
                       ? Text(
-                          widget.profile.fullName.isNotEmpty
-                              ? widget.profile.fullName[0].toUpperCase()
-                              : '?',
+                          widget.profile.avatarInitials,
                           style: const TextStyle(
-                            fontSize: 28,
+                            fontSize: 36,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFFFF9800),
+                            color: AppColors.primaryBlue,
                           ),
                         )
                       : null,
                 ),
               ),
-              const SizedBox(height: 24),
-
-              // Ô nhập Họ và Tên
-              TextFormField(
-                controller: _fullNameController,
-                decoration: InputDecoration(
-                  labelText: 'Họ và tên',
-                  prefixIcon: const Icon(Icons.person_outline),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+              const SizedBox(height: AppSpacing.xl),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceCard,
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(color: AppColors.borderStructural),
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập họ và tên';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // Ô nhập Mã sinh viên
-              TextFormField(
-                controller: _studentIdController,
-                decoration: InputDecoration(
-                  labelText: 'Mã sinh viên',
-                  prefixIcon: const Icon(Icons.badge_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                child: Column(
+                  children: [
+                    _buildTextField(
+                      controller: _nameController,
+                      label: 'Họ và tên',
+                      icon: Icons.person_outline_rounded,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Vui lòng nhập họ tên'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildTextField(
+                      controller: _studentIdController,
+                      label: 'Mã sinh viên (MSSV)',
+                      icon: Icons.badge_outlined,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Vui lòng nhập MSSV'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildTextField(
+                      controller: _majorController,
+                      label: 'Chuyên ngành',
+                      icon: Icons.school_outlined,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Vui lòng nhập chuyên ngành'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildTextField(
+                      controller: _cohortController,
+                      label: 'Khóa học (VD: K18)',
+                      icon: Icons.calendar_today_outlined,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Vui lòng nhập khóa học'
+                          : null,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _buildTextField(
+                      controller: _targetGpaController,
+                      label: 'GPA mục tiêu (Hệ 4.0)',
+                      icon: Icons.stars_outlined,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Vui lòng nhập GPA mục tiêu'
+                          : null,
+                    ),
+                  ],
                 ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập mã sinh viên';
-                  }
-                  return null;
-                },
               ),
-              const SizedBox(height: 16),
-
-              // Ô nhập GPA mục tiêu
-              TextFormField(
-                controller: _targetGpaController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'GPA mục tiêu',
-                  prefixIcon: const Icon(Icons.flag_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Vui lòng nhập GPA mục tiêu';
-                  }
-                  final gpa = double.tryParse(value);
-                  if (gpa == null || gpa < 0.0 || gpa > 4.0) {
-                    return 'GPA phải nằm trong khoảng từ 0.0 đến 4.0';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 32),
-
-              // Nút Lưu thay đổi
+              const SizedBox(height: AppSpacing.xxl),
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: _isSaving ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1976D2),
+                    backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    elevation: 0,
                   ),
                   child: _isSaving
                       ? const SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: 24,
+                          height: 24,
                           child: CircularProgressIndicator(
                             color: Colors.white,
-                            strokeWidth: 2,
+                            strokeWidth: 2.5,
                           ),
                         )
                       : const Text(
@@ -220,6 +245,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      validator: validator,
+      enabled: !_isSaving,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: AppColors.textSecondary),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.borderStructural),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.borderStructural),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(
+            color: AppColors.primaryBlue,
+            width: 1.5,
+          ),
+        ),
+        filled: true,
+        fillColor: AppColors.canvasBg,
       ),
     );
   }
