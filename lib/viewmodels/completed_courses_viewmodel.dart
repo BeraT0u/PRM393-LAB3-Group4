@@ -27,6 +27,10 @@ class CurrentStudentUidNotifier extends Notifier<String> {
       state = uid;
     }
   }
+
+  void clear() {
+    state = '';
+  }
 }
 
 final currentStudentUidProvider =

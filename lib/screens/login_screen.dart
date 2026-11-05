@@ -71,6 +71,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
 
       ref.read(currentStudentUidProvider.notifier).setUid(uid);
+      ref.invalidate(completedCoursesViewModelProvider);
+
       ref.read(analyticsServiceProvider).logLogin(method: 'google');
       ref.read(analyticsServiceProvider).setUserId(uid);
 

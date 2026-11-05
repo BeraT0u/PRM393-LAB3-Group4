@@ -49,6 +49,9 @@ class AuthService {
   /// Đăng xuất tài khoản
   Future<void> signOut() async {
     try {
+      try {
+        await _googleSignIn.disconnect();
+      } catch (_) {}
       await _googleSignIn.signOut();
       await _auth?.signOut();
       AppLogger.info('Đã đăng xuất tài khoản thành công.');

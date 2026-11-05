@@ -368,6 +368,12 @@ class ProfileScreen extends ConsumerWidget {
               Navigator.of(dlgCtx).pop();
               await ref.read(analyticsServiceProvider).logLogout();
               await ref.read(authServiceProvider).signOut();
+
+              // Xóa toàn bộ cache phiên làm việc và reset state giữa các tài khoản
+              ref.read(currentStudentUidProvider.notifier).clear();
+              ref.invalidate(completedCoursesViewModelProvider);
+              ref.invalidate(planAnalyzerViewModelProvider);
+
               if (!context.mounted) return;
               Navigator.of(context).pushNamedAndRemoveUntil(
                 '/login',

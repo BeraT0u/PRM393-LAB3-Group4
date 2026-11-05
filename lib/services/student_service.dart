@@ -15,6 +15,17 @@ class StudentService {
   final Map<String, StudentProfileModel> _localProfiles = {};
   final Map<String, List<CompletedCourseModel>> _localCompletedCourses = {};
 
+  /// Xóa bộ nhớ đệm cục bộ (khi đăng xuất hoặc chuyển đổi tài khoản)
+  void clearLocalCache([String? uid]) {
+    if (uid != null) {
+      _localProfiles.remove(uid);
+      _localCompletedCourses.remove(uid);
+    } else {
+      _localProfiles.clear();
+      _localCompletedCourses.clear();
+    }
+  }
+
   StudentService({FirebaseFirestore? firestore})
       : _firestore = firestore ??
             (Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null);
@@ -77,7 +88,21 @@ class StudentService {
     }
 
     try {
-      final doc = await ref.doc(uid).get();
+      var doc = await ref.doc(uid).get();
+
+      // Nếu chưa có doc theo uid, kiểm tra xem email này đã từng có tài khoản trong hệ thống chưa
+      if ((!doc.exists || doc.data() == null) && email != null && email.trim().isNotEmpty) {
+        final normalizedEmail = email.trim().toLowerCase();
+        final emailQuery = await ref
+            .where('email', isEqualTo: normalizedEmail)
+            .limit(1)
+            .get();
+        if (emailQuery.docs.isNotEmpty) {
+          doc = emailQuery.docs.first;
+          AppLogger.info('Đã tìm thấy tài khoản sinh viên qua email: $normalizedEmail (id: \${doc.id})');
+        }
+      }
+
       if (doc.exists && doc.data() != null) {
         var loaded = StudentProfileModel.fromMap(doc.data()!, doc.id);
 

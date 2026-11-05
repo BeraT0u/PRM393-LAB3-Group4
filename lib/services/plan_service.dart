@@ -11,6 +11,15 @@ class PlanService {
   /// Giữ nguyên dữ liệu kể cả khi người dùng chuyển qua lại giữa các màn hình/tab khác
   final Map<String, StudyPlanModel> _localDraftPlans = {};
 
+  /// Xóa bộ nhớ đệm kế hoạch cục bộ (khi đăng xuất hoặc chuyển đổi tài khoản)
+  void clearLocalCache([String? userId]) {
+    if (userId != null) {
+      _localDraftPlans.remove(userId);
+    } else {
+      _localDraftPlans.clear();
+    }
+  }
+
   PlanService({FirebaseFirestore? firestore})
       : _firestore = firestore ??
             (Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null);
