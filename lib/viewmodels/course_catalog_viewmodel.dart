@@ -76,7 +76,10 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
       final studentService = ref.read(studentServiceProvider);
       final profile = await studentService.getStudentProfile(uid);
       final completed = await studentService.getCompletedCourses(uid);
-      passed = {...profile.passedCourseCodes, ...completed.map((c) => c.code)}.toList();
+      passed = {
+        ...profile.passedCourseCodes,
+        ...completed.where((c) => c.isActuallyPassed).map((c) => c.code),
+      }.toList();
     } catch (_) {
       // Offline fallback
     }

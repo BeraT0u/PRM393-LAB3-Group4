@@ -55,31 +55,34 @@ class CourseDetailScreen extends ConsumerWidget {
           : _ActionFooter(
               isFavorite: state.isFavorite,
               onFavorite: vm.toggleFavorite,
-              onAddToPlan: () {
-                final planned = state.plannedCourse;
-                if (replacingCourseCode != null) {
-                  ref
-                      .read(planAnalyzerViewModelProvider.notifier)
-                      .replaceConflictCourse(
-                        replacement: planned,
-                        targetCodeToReplace: replacingCourseCode,
+              isAlreadyPassed: state.isAlreadyPassed,
+              onAddToPlan: state.isAlreadyPassed
+                  ? null
+                  : () {
+                      final planned = state.plannedCourse;
+                      if (replacingCourseCode != null) {
+                        ref
+                            .read(planAnalyzerViewModelProvider.notifier)
+                            .replaceConflictCourse(
+                              replacement: planned,
+                              targetCodeToReplace: replacingCourseCode,
+                            );
+                        ref
+                            .read(courseCatalogViewModelProvider.notifier)
+                            .setOnlyEligible(
+                              false,
+                              replacingCourseCode: null,
+                            );
+                      } else {
+                        ref
+                            .read(planAnalyzerViewModelProvider.notifier)
+                            .applyIncomingCourse(planned);
+                      }
+                      Navigator.of(context).pushNamed(
+                        '/plan-analyzer',
+                        arguments: planned,
                       );
-                  ref
-                      .read(courseCatalogViewModelProvider.notifier)
-                      .setOnlyEligible(
-                        false,
-                        replacingCourseCode: null,
-                      );
-                } else {
-                  ref
-                      .read(planAnalyzerViewModelProvider.notifier)
-                      .applyIncomingCourse(planned);
-                }
-                Navigator.of(context).pushNamed(
-                  '/plan-analyzer',
-                  arguments: planned,
-                );
-              },
+                    },
             ),
       body: async.when(
         loading: () => const Padding(
@@ -141,8 +144,49 @@ class _DetailBody extends StatelessWidget {
                 type: StatusBadgeType.warning,
               ),
               _prerequisiteBadge(),
+              if (state.isAlreadyPassed)
+                const StatusBadge(
+                  label: 'Đã hoàn thành ✅',
+                  type: StatusBadgeType.success,
+                ),
             ],
           ),
+
+          if (state.isAlreadyPassed) ...[
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 10,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.successSurface,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.successBorder),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: AppColors.successText,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bạn đã hoàn thành và đạt môn học này. Môn đã đạt không thể thêm lại vào kế hoạch học mới.',
+                      style: TextStyle(
+                        color: AppColors.successText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           // UC-17: Cấu trúc điểm
           if (course.assessmentBreakdown.isNotEmpty) ...[
@@ -418,12 +462,14 @@ class _GradeTargetCard extends StatelessWidget {
 class _ActionFooter extends StatelessWidget {
   final bool isFavorite;
   final VoidCallback onFavorite;
-  final VoidCallback onAddToPlan;
+  final VoidCallback? onAddToPlan;
+  final bool isAlreadyPassed;
 
   const _ActionFooter({
     required this.isFavorite,
     required this.onFavorite,
     required this.onAddToPlan,
+    this.isAlreadyPassed = false,
   });
 
   @override
@@ -465,9 +511,16 @@ class _ActionFooter extends StatelessWidget {
         const SizedBox(width: AppSpacing.md),
         Expanded(
           child: AppPrimaryButton(
-            label: 'Thêm vào Kế hoạch',
-            leadingIcon: Icons.add_task_rounded,
-            onPressed: onAddToPlan,
+            label: isAlreadyPassed
+                ? 'Đã đạt môn (Không thể thêm)'
+                : 'Thêm vào Kế hoạch',
+            semanticsLabel: isAlreadyPassed
+                ? 'Môn này đã hoàn thành, không thể thêm vào kế hoạch'
+                : 'Thêm vào Kế hoạch',
+            leadingIcon: isAlreadyPassed
+                ? Icons.check_circle_rounded
+                : Icons.add_task_rounded,
+            onPressed: isAlreadyPassed ? null : onAddToPlan,
           ),
         ),
       ],

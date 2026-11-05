@@ -147,7 +147,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       final completed = await studentService.getCompletedCourses(uid);
       final merged = {
         ...profile.passedCourseCodes,
-        ...completed.map((c) => c.code),
+        ...completed.where((c) => c.isActuallyPassed).map((c) => c.code),
       }.toList();
 
       // Tự động xác định học kỳ hiện tại của tài khoản dựa trên dữ liệu môn đã học (SCR-03)
@@ -164,16 +164,28 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       );
 
       if (state.plan.userId == uid) {
+        // Loại bỏ môn đã hoàn thành/đạt khỏi kế hoạch nếu trước đó lỡ thêm vào
+        final currentSelected = state.plan.selectedCourses
+            .where((c) => !merged.contains(c.code))
+            .toList();
+        final loadedSelected = loadedPlan.selectedCourses
+            .where((c) => !merged.contains(c.code))
+            .toList();
+
         final effectivePlan = state.plan.selectedCourses.isNotEmpty
             ? state.plan.copyWith(
                 id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
                 semesterName: currentSemesterName,
+                selectedCourses: currentSelected,
+                tuitionFee: _calculateTuition(currentSelected),
               )
             : loadedPlan.copyWith(
                 semesterName: currentSemesterName,
+                selectedCourses: loadedSelected,
                 targetGpa: profile.targetGpa > 0
                     ? profile.targetGpa
                     : loadedPlan.targetGpa,
+                tuitionFee: _calculateTuition(loadedSelected),
               );
         _planService.saveLocalDraftPlan(effectivePlan);
         state = state.copyWith(
@@ -214,6 +226,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
   /// Cập nhật/thêm môn được chọn từ SCR-05 vào kế hoạch nháp ở local
   void applyIncomingCourse(CourseModel incomingCourse) {
+    if (state.passedCourseCodes.contains(incomingCourse.code)) {
+      state = state.copyWith(
+        errorMessage: 'Môn ${incomingCourse.code} đã hoàn thành, không thể thêm vào kế hoạch!',
+      );
+      return;
+    }
+
     final currentCourses = List<CourseModel>.from(state.plan.selectedCourses);
     final existingIndex =
         currentCourses.indexWhere((c) => c.code == incomingCourse.code);
@@ -262,6 +281,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     final codeToReplace = targetCodeToReplace ?? conflict?.code ?? 'IAE201';
     final targetReplacement = replacement ??
         DatabaseSeeder.sampleCourses.firstWhere((c) => c.code == 'PRM323');
+
+    if (state.passedCourseCodes.contains(targetReplacement.code)) {
+      state = state.copyWith(
+        errorMessage: 'Môn ${targetReplacement.code} đã hoàn thành, không thể dùng để thay thế!',
+      );
+      return;
+    }
 
     final updatedCourses = <CourseModel>[];
     bool replaced = false;

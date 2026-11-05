@@ -95,8 +95,24 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
     );
   }
 
-  void _handleCourseTap(CourseModel course, String? replacingCourseCode) {
+  void _handleCourseTap(
+    CourseModel course,
+    String? replacingCourseCode, {
+    List<String> passedCourseCodes = const [],
+  }) {
     if (replacingCourseCode != null) {
+      if (passedCourseCodes.contains(course.code)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '⚠️ Môn ${course.code} đã hoàn thành, không thể dùng để thay thế!',
+            ),
+            backgroundColor: AppColors.dangerBorder,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
       _showConfirmReplaceDialog(course, replacingCourseCode);
     } else {
       _openCourse(course);
@@ -352,12 +368,20 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
                   itemCount: courses.length,
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: AppSpacing.md),
-                  itemBuilder: (context, i) => CourseStrategyCard(
-                    course: courses[i],
-                    variant: CourseCardVariant.catalog,
-                    onTap: () =>
-                        _handleCourseTap(courses[i], data.replacingCourseCode),
-                  ),
+                  itemBuilder: (context, i) {
+                    final course = courses[i];
+                    final isPassed = data.passedCourseCodes.contains(course.code);
+                    return CourseStrategyCard(
+                      course: course,
+                      variant: CourseCardVariant.catalog,
+                      completedScoreLabel: isPassed ? 'Đã đạt ✅' : null,
+                      onTap: () => _handleCourseTap(
+                        course,
+                        data.replacingCourseCode,
+                        passedCourseCodes: data.passedCourseCodes,
+                      ),
+                    );
+                  },
                 );
               },
             ),
