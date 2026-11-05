@@ -141,10 +141,12 @@ class CompletedCoursesState {
     return result;
   }
 
-  Set<String> get passedCodes =>
-      {...profile.passedCourseCodes, ...completed.map((c) => c.code)};
+  Set<String> get passedCodes => {
+        ...profile.passedCourseCodes,
+        ...completed.where((c) => c.isActuallyPassed).map((c) => c.code),
+      };
 
-  /// Môn trong catalog có thể thêm (chưa học)
+  /// Môn trong catalog có thể thêm (chưa học hoặc đã từng rớt cần học lại)
   List<CourseModel> get addableCourses =>
       catalog.where((c) => !passedCodes.contains(c.code)).toList();
 
@@ -192,8 +194,14 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     final realGpa = validCourses.isNotEmpty
         ? GpaCalculator.calculateGpa(validCourses)
         : profile.currentGpa;
+    final uniquePassed = <String, CompletedCourseModel>{};
+    for (final c in completed) {
+      if (c.isActuallyPassed) {
+        uniquePassed[c.code] = c;
+      }
+    }
     final realCredits = completed.isNotEmpty
-        ? completed.where((c) => c.isActuallyPassed).fold<int>(0, (int total, c) => total + c.credits)
+        ? uniquePassed.values.fold<int>(0, (int total, c) => total + c.credits)
         : profile.accumulatedCredits;
 
     final syncedProfile = profile.copyWith(

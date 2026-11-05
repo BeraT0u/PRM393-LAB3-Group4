@@ -289,6 +289,17 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       return;
     }
 
+    // Không cho phép đổi sang môn đã có trong kế hoạch kỳ này
+    final isAlreadyInPlan = state.plan.selectedCourses.any(
+      (c) => c.code == targetReplacement.code && c.code != codeToReplace,
+    );
+    if (isAlreadyInPlan) {
+      state = state.copyWith(
+        errorMessage: 'Môn ${targetReplacement.code} đã có trong kế hoạch kỳ này!',
+      );
+      return;
+    }
+
     final updatedCourses = <CourseModel>[];
     bool replaced = false;
 

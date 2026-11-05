@@ -67,13 +67,15 @@ class StudentService {
           );
       final localDone = _localCompletedCourses[uid];
       if (localDone != null && localDone.isNotEmpty) {
-        final localCredits = localDone
-            .where((c) => c.isActuallyPassed)
+        final uniquePassed = <String, CompletedCourseModel>{};
+        for (final c in localDone) {
+          if (c.isActuallyPassed) {
+            uniquePassed[c.code] = c;
+          }
+        }
+        final localCredits = uniquePassed.values
             .fold<int>(0, (int total, c) => total + c.credits);
-        final localCodes = localDone
-            .where((c) => c.isActuallyPassed)
-            .map((c) => c.code)
-            .toList();
+        final localCodes = uniquePassed.keys.toList();
         final localGpa = GpaCalculator.calculateGpa(localDone);
         final synced = cached.copyWith(
           accumulatedCredits: localCredits,
@@ -115,13 +117,15 @@ class StudentService {
               .toList();
           _localCompletedCourses[uid] = realCompleted;
 
-          final realCredits = realCompleted
-              .where((c) => c.isActuallyPassed)
+          final uniquePassed = <String, CompletedCourseModel>{};
+          for (final c in realCompleted) {
+            if (c.isActuallyPassed) {
+              uniquePassed[c.code] = c;
+            }
+          }
+          final realCredits = uniquePassed.values
               .fold<int>(0, (int total, c) => total + c.credits);
-          final realCodes = realCompleted
-              .where((c) => c.isActuallyPassed)
-              .map((c) => c.code)
-              .toList();
+          final realCodes = uniquePassed.keys.toList();
           final realGpa = GpaCalculator.calculateGpa(realCompleted);
 
           loaded = loaded.copyWith(
@@ -339,21 +343,24 @@ class StudentService {
       isPassed: isPassed,
     );
 
-    // Cập nhật bộ nhớ đệm local ngay lập tức
+    // Cập nhật bộ nhớ đệm local ngay lập tức: thay thế nếu cùng kỳ, giữ nguyên nếu khác kỳ
     final updatedCompletedList = [
-      ...existingCompleted.where((c) => c.code != course.code),
+      ...existingCompleted.where(
+        (c) => !(c.code == course.code && c.semesterIndex == semesterIndex),
+      ),
       newCompletedCourse,
     ];
     _localCompletedCourses[uid] = updatedCompletedList;
 
-    final updatedPassedCodes = updatedCompletedList
-        .where((c) => c.isActuallyPassed)
-        .map((c) => c.code)
-        .toSet()
-        .toList();
+    final uniquePassed = <String, CompletedCourseModel>{};
+    for (final c in updatedCompletedList) {
+      if (c.isActuallyPassed) {
+        uniquePassed[c.code] = c;
+      }
+    }
 
-    final updatedCredits = updatedCompletedList
-        .where((c) => c.isActuallyPassed)
+    final updatedPassedCodes = uniquePassed.keys.toList();
+    final updatedCredits = uniquePassed.values
         .fold<int>(0, (int total, c) => total + c.credits);
 
     final updatedGpa = GpaCalculator.calculateGpa(updatedCompletedList);
@@ -370,10 +377,11 @@ class StudentService {
     final ref = _studentsRef;
     if (ref != null) {
       try {
+        final docKey = '${semesterIndex}_${course.code}';
         final courseDoc = ref
             .doc(uid)
             .collection('completed_courses')
-            .doc(course.code);
+            .doc(docKey);
 
         final courseData = {
           'courseId': course.id,
@@ -427,7 +435,8 @@ class StudentService {
     final targetSemester = plannedSemesterIndex ?? (maxExistingSemester + 1);
 
     final updatedCompletedMap = <String, CompletedCourseModel>{
-      for (final c in existingCompleted) c.code: c,
+      for (final c in existingCompleted)
+        '${c.semesterIndex ?? 0}_${c.code}': c,
     };
     final newPassedCodes = Set<String>.from(profile.passedCourseCodes);
     int addedCredits = 0;
@@ -449,7 +458,8 @@ class StudentService {
       final isActuallyPassed = isPassed && grade >= 4.0;
       final isAlreadyPassed = newPassedCodes.contains(course.code);
 
-      updatedCompletedMap[course.code] = CompletedCourseModel(
+      final docKey = '${targetSemester}_${course.code}';
+      updatedCompletedMap[docKey] = CompletedCourseModel(
         code: course.code,
         name: course.name,
         credits: course.credits,
@@ -471,11 +481,19 @@ class StudentService {
     final allCompletedList = updatedCompletedMap.values.toList();
     _localCompletedCourses[uid] = allCompletedList;
 
+    final uniquePassed = <String, CompletedCourseModel>{};
+    for (final c in allCompletedList) {
+      if (c.isActuallyPassed) {
+        uniquePassed[c.code] = c;
+      }
+    }
+    final allCredits = uniquePassed.values
+        .fold<int>(0, (int total, c) => total + c.credits);
     final updatedGpa = GpaCalculator.calculateGpa(allCompletedList);
 
     final updatedProfile = profile.copyWith(
-      accumulatedCredits: profile.accumulatedCredits + addedCredits,
-      passedCourseCodes: newPassedCodes.toList(),
+      accumulatedCredits: allCredits,
+      passedCourseCodes: uniquePassed.keys.toList(),
       currentGpa: updatedGpa,
       isNewStudent: false,
     );
@@ -488,11 +506,12 @@ class StudentService {
       try {
         final batch = firestore.batch();
         for (final course in plan.selectedCourses) {
-          final completedItem = updatedCompletedMap[course.code]!;
+          final docKey = '${targetSemester}_${course.code}';
+          final completedItem = updatedCompletedMap[docKey]!;
           final completedRef = ref
               .doc(uid)
               .collection('completed_courses')
-              .doc(course.code);
+              .doc(docKey);
 
           batch.set(completedRef, {
             'courseId': course.id,

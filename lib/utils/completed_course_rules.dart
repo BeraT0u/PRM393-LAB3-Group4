@@ -7,6 +7,7 @@ class CompletedCourseRules {
   static const int minSemester = 1;
   static const int maxSemester = 9;
   static const double minPassGrade = 4.0;
+  static const double minGrade = 0.0;
   static const double maxGrade = 10.0;
 
   /// Kiểm tra thêm [course] vào Kỳ [semesterIndex].
@@ -26,11 +27,20 @@ class CompletedCourseRules {
       return 'Kỳ học phải nằm trong khoảng $minSemester–$maxSemester.';
     }
 
-    // 0. Không khai báo trùng môn đã học (tránh cộng tín chỉ 2 lần)
-    final alreadyDone = legacyPassedCodes.contains(course.code) ||
-        completed.any((c) => c.code == course.code);
-    if (alreadyDone) {
-      return 'Môn ${course.code} đã có trong danh sách môn đã học.';
+    // 0. Kiểm tra trùng môn:
+    // - Không thể thêm nếu môn này ĐÃ ĐẠT ở bất kỳ kỳ nào trước đó hoặc trong hồ sơ
+    // - Không thể thêm nếu môn này đã có trong chính kỳ này (tránh khai báo trùng trong cùng 1 kỳ)
+    final alreadyPassed = legacyPassedCodes.contains(course.code) ||
+        completed.any((c) => c.code == course.code && c.isActuallyPassed);
+    if (alreadyPassed) {
+      return 'Môn ${course.code} đã hoàn thành và đạt điểm tích lũy.';
+    }
+
+    final alreadyInSameSemester = completed.any(
+      (c) => c.code == course.code && c.semesterIndex == semesterIndex,
+    );
+    if (alreadyInSameSemester) {
+      return 'Môn ${course.code} đã có trong Kỳ $semesterIndex.';
     }
 
     // 1. Ràng buộc tiến trình kỳ: kỳ N cần có đủ kỳ 1..N-1
@@ -42,27 +52,28 @@ class CompletedCourseRules {
       }
     }
 
-    // 2. Ràng buộc tiên quyết: phải hoàn thành ở kỳ trước (< N)
+    // 2. Ràng buộc tiên quyết: phải hoàn thành VÀ ĐẠT ở kỳ trước (< N)
     final prereq = course.prerequisiteCode?.trim();
     if (prereq != null && prereq.isNotEmpty) {
       final satisfied = legacyPassedCodes.contains(prereq) ||
           completed.any((c) =>
               c.code == prereq &&
+              c.isActuallyPassed &&
               (c.semesterIndex == null || c.semesterIndex! < semesterIndex));
       if (!satisfied) {
         return 'Không thể thêm môn ${course.code} vào Kỳ $semesterIndex vì '
-            'chưa hoàn thành môn tiên quyết $prereq ở các kỳ trước.';
+            'chưa hoàn thành đạt môn tiên quyết $prereq ở các kỳ trước.';
       }
     }
 
     return null;
   }
 
-  /// Kiểm tra điểm nhập vào (thang 10, đạt từ 4.0).
+  /// Kiểm tra điểm nhập vào (thang 10, từ 0.0 đến 10.0). Điểm < 4.0 là Rớt.
   static String? validateGrade(double? grade) {
     if (grade == null) return 'Vui lòng nhập điểm hợp lệ (ví dụ 8.5).';
-    if (grade < minPassGrade || grade > maxGrade) {
-      return 'Điểm môn đã học phải từ $minPassGrade đến $maxGrade.';
+    if (grade < minGrade || grade > maxGrade) {
+      return 'Điểm môn đã học phải từ ${minGrade.toInt()} đến ${maxGrade.toInt()}.';
     }
     return null;
   }

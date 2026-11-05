@@ -113,6 +113,22 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
         );
         return;
       }
+      final planCourses = ref.read(planAnalyzerViewModelProvider).plan.selectedCourses;
+      final isAlreadyInPlan = planCourses.any(
+        (c) => c.code == course.code && c.code != replacingCourseCode,
+      );
+      if (isAlreadyInPlan) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '⚠️ Môn ${course.code} đã có trong kế hoạch kỳ này!',
+            ),
+            backgroundColor: AppColors.dangerBorder,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
       _showConfirmReplaceDialog(course, replacingCourseCode);
     } else {
       _openCourse(course);

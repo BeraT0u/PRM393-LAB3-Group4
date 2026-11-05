@@ -330,10 +330,17 @@ class _AddCompletedCourseSheetState extends ConsumerState<AddCompletedCourseShee
       return;
     }
 
+    final isPassed = grade != null && grade >= 4.0;
     final messenger = ScaffoldMessenger.of(context);
     Navigator.of(context).pop();
     messenger.showSnackBar(
-      SnackBar(content: Text('Đã thêm ${course.code} vào Kỳ $_semester (+${course.credits} TC)')),
+      SnackBar(
+        content: Text(
+          isPassed
+              ? 'Đã thêm ${course.code} vào Kỳ $_semester (+${course.credits} TC)'
+              : 'Đã thêm ${course.code} vào Kỳ $_semester (Rớt: 0 TC)',
+        ),
+      ),
     );
   }
 
