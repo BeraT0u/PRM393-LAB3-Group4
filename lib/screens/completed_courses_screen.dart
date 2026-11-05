@@ -193,7 +193,7 @@ class _ProgressCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'GPA hiện tại ${p.currentGpa.toStringAsFixed(2)} • '
+              'GPA hiện tại ${state.calculatedGpa > 0 ? state.calculatedGpa.toStringAsFixed(2) : "0.00"} • '
               'Mục tiêu ${p.targetGpa.toStringAsFixed(2)}',
               style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary),
             ),
@@ -250,13 +250,24 @@ class _CompletedCourseTile extends StatelessWidget {
                     StatusBadge(label: semester, type: StatusBadgeType.neutral),
                     if (course.credits > 0)
                       StatusBadge(label: '${course.credits} TC', type: StatusBadgeType.primaryTonal),
+                    if (course.grade != null)
+                      StatusBadge(
+                        label: 'GPA ${course.gpa4.toStringAsFixed(1)}',
+                        type: StatusBadgeType.primaryTonal,
+                      ),
                   ],
                 ),
               ],
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          if (course.gradeLetter != null)
+          if (course.grade != null)
+            StatusBadge(
+              label: 'Điểm ${course.grade!.toStringAsFixed(1)} (${course.effectiveGradeLetter})',
+              type: course.isActuallyPassed ? StatusBadgeType.success : StatusBadgeType.danger,
+              icon: course.isActuallyPassed ? Icons.check_circle_rounded : Icons.cancel_outlined,
+            )
+          else if (course.gradeLetter != null)
             StatusBadge(
               label: 'Điểm ${course.gradeLetter}',
               type: StatusBadgeType.success,

@@ -1,3 +1,4 @@
+import '../utils/gpa_calculator.dart';
 import 'course_model.dart';
 
 /// Môn đã hoàn thành của sinh viên (document trong `students/{uid}/completed_courses`).
@@ -28,15 +29,31 @@ class CompletedCourseModel {
   /// Kiểm tra xem môn học này đã đạt (pass) hay chưa
   bool get isActuallyPassed => isPassed && (grade == null || grade! >= 4.0);
 
+  /// Điểm chữ chuẩn (A, B+, B, C+, C, D+, D, F)
+  String get effectiveGradeLetter {
+    if (gradeLetter != null && gradeLetter!.isNotEmpty) return gradeLetter!;
+    if (grade != null) return GpaCalculator.grade10ToLetter(grade!);
+    return 'Đạt';
+  }
+
+  /// GPA hệ 4.0 quy đổi từ điểm
+  double get gpa4 {
+    if (grade != null) return GpaCalculator.grade10ToGpa4(grade!);
+    if (gradeLetter != null) return GpaCalculator.letterToGpa4(gradeLetter);
+    return 0.0;
+  }
+
   factory CompletedCourseModel.fromMap(Map<String, dynamic> map, String docId) {
     final grade = (map['grade'] as num?)?.toDouble();
     final isPassedVal = map['isPassed'] as bool?;
+    final gradeLetter = (map['gradeLetter'] as String?) ??
+        (grade != null ? GpaCalculator.grade10ToLetter(grade) : null);
     return CompletedCourseModel(
       code: (map['code'] as String?) ?? docId,
       name: (map['name'] as String?) ?? '',
       credits: (map['credits'] as num?)?.toInt() ?? 0,
       grade: grade,
-      gradeLetter: map['gradeLetter'] as String?,
+      gradeLetter: gradeLetter,
       semesterIndex: (map['semesterIndex'] as num?)?.toInt(),
       semesterName: map['semesterName'] as String?,
       isPassed: isPassedVal ?? (grade == null || grade >= 4.0),

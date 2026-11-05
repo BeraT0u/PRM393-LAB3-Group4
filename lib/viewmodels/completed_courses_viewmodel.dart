@@ -7,6 +7,7 @@ import '../services/service_providers.dart';
 import '../services/student_service.dart';
 import '../utils/app_logger.dart';
 import '../utils/completed_course_rules.dart';
+import '../utils/gpa_calculator.dart';
 import 'course_catalog_viewmodel.dart';
 import 'plan_analyzer_viewmodel.dart';
 
@@ -76,6 +77,15 @@ class CompletedCoursesState {
   }
 
   int get progressPercent => (progress * 100).round();
+
+  /// GPA tính tự động từ danh sách môn đã hoàn thành
+  double get calculatedGpa {
+    final validCourses = completed.where((c) => c.grade != null || c.gradeLetter != null).toList();
+    if (validCourses.isNotEmpty) {
+      return GpaCalculator.calculateGpa(validCourses);
+    }
+    return profile.currentGpa;
+  }
 
   /// Các môn có sẵn trong hồ sơ nhưng chưa nằm trong `completed_courses`,
   /// hiển thị ở nhóm "Chưa phân kỳ".
@@ -174,8 +184,21 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     final completedCodes = completed.map((c) => c.code).toSet();
     final legacy = profile.passedCourseCodes.where((c) => !completedCodes.contains(c)).toSet();
 
+    final validCourses = completed.where((c) => c.grade != null || c.gradeLetter != null).toList();
+    final realGpa = validCourses.isNotEmpty
+        ? GpaCalculator.calculateGpa(validCourses)
+        : profile.currentGpa;
+    final realCredits = completed.isNotEmpty
+        ? completed.where((c) => c.isActuallyPassed).fold<int>(0, (int total, c) => total + c.credits)
+        : profile.accumulatedCredits;
+
+    final syncedProfile = profile.copyWith(
+      currentGpa: realGpa,
+      accumulatedCredits: realCredits,
+    );
+
     var next = CompletedCoursesState(
-      profile: profile,
+      profile: syncedProfile,
       completed: completed,
       legacyPassedCodes: legacy,
       catalog: catalog,

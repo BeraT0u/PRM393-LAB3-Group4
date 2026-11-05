@@ -5,7 +5,6 @@ import 'package:eduplan/services/database_seeder.dart';
 import 'package:eduplan/services/service_providers.dart';
 import 'package:eduplan/viewmodels/completed_courses_viewmodel.dart';
 import 'package:eduplan/viewmodels/plan_analyzer_viewmodel.dart';
-import 'package:eduplan/viewmodels/semester_summary_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
