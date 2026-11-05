@@ -99,31 +99,21 @@ class StudentService {
               .toList();
           final realGpa = GpaCalculator.calculateGpa(realCompleted);
 
-          final bool hadFakeSeedId = loaded.studentId == 'SE180504' &&
-              (loaded.email == null ||
-                  !loaded.email!.toLowerCase().contains('se180504'));
-
           loaded = loaded.copyWith(
             email: email ?? loaded.email,
             avatarUrl: (photoUrl != null && photoUrl.startsWith('http'))
                 ? photoUrl
                 : loaded.avatarUrl,
-            studentId: hadFakeSeedId ? '' : loaded.studentId,
-            major: hadFakeSeedId ? '' : loaded.major,
-            cohort: hadFakeSeedId ? '' : loaded.cohort,
+            studentId: loaded.studentId,
+            major: loaded.major,
+            cohort: loaded.cohort,
             currentGpa: realCompleted.isNotEmpty
                 ? realGpa
-                : ((hadFakeSeedId && realCompleted.isEmpty)
-                    ? 0.0
-                    : loaded.currentGpa),
-            targetGpa: ((hadFakeSeedId || loaded.isNewStudent) &&
-                    loaded.targetGpa == 3.50 &&
-                    realCompleted.isEmpty)
-                ? 0.0
-                : (hadFakeSeedId ? 0.0 : loaded.targetGpa),
+                : loaded.currentGpa,
+            targetGpa: loaded.targetGpa,
             accumulatedCredits: realCredits,
             passedCourseCodes: realCodes,
-            isNewStudent: hadFakeSeedId ? true : loaded.isNewStudent,
+            isNewStudent: (loaded.studentId.isEmpty && realCompleted.isEmpty),
           );
           await ref.doc(uid).set(loaded.toMap(), SetOptions(merge: true));
         }
