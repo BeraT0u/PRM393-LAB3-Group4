@@ -37,9 +37,6 @@ class ProfileScreen extends ConsumerWidget {
     final studentIdCtrl = TextEditingController(text: profile.studentId);
     final majorCtrl = TextEditingController(text: profile.major);
     final cohortCtrl = TextEditingController(text: profile.cohort);
-    final currentGpaCtrl = TextEditingController(
-      text: profile.currentGpa > 0 ? profile.currentGpa.toStringAsFixed(2) : '',
-    );
     final targetGpaCtrl = TextEditingController(
       text: profile.targetGpa > 0 ? profile.targetGpa.toStringAsFixed(2) : '',
     );
@@ -128,15 +125,17 @@ class ProfileScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: TextField(
-                        controller: currentGpaCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
+                      child: InputDecorator(
                         decoration: const InputDecoration(
                           labelText: 'GPA hiện tại (hệ 4)',
-                          hintText: 'VD: 3.20',
+                          helperText: 'Tự động tính từ các môn đã nhập',
                           border: OutlineInputBorder(),
+                        ),
+                        child: Text(
+                          profile.currentGpa > 0
+                              ? profile.currentGpa.toStringAsFixed(2)
+                              : '0.00 (Chưa có môn)',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -164,9 +163,6 @@ class ProfileScreen extends ConsumerWidget {
                     final studentId = studentIdCtrl.text.trim();
                     final major = majorCtrl.text.trim();
                     final cohort = cohortCtrl.text.trim();
-                    final currentGpa =
-                        double.tryParse(currentGpaCtrl.text.trim()) ??
-                            profile.currentGpa;
                     final targetGpa =
                         double.tryParse(targetGpaCtrl.text.trim()) ??
                             profile.targetGpa;
@@ -193,7 +189,6 @@ class ProfileScreen extends ConsumerWidget {
                           avatarUrl: hasHttpAvatar
                               ? profile.avatarUrl
                               : avatarInitials,
-                          currentGpa: currentGpa.clamp(0.0, 4.0),
                           targetGpa: targetGpa.clamp(0.0, 4.0),
                         );
 

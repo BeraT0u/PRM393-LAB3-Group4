@@ -68,7 +68,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             email: email,
             displayName: displayName,
             photoUrl: photoUrl,
-            forceRefresh: true,
           );
 
       ref.read(currentStudentUidProvider.notifier).setUid(uid);

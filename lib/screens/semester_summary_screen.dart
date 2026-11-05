@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import '../models/completed_course_model.dart';
 import '../models/course_model.dart';
+import '../utils/gpa_calculator.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../viewmodels/semester_summary_viewmodel.dart';
@@ -49,86 +51,27 @@ class SemesterSummaryScreen extends ConsumerWidget {
   Future<void> _confirmCompleteSemester(BuildContext context, WidgetRef ref) async {
     final state = ref.read(semesterSummaryViewModelProvider);
     final vm = ref.read(semesterSummaryViewModelProvider.notifier);
-    final theme = Theme.of(context);
 
-    final confirmed = await showDialog<bool>(
+
+    final results = await showDialog<List<CourseGradeItem>>(
       context: context,
-      builder: (dialogCtx) {
-        return AlertDialog(
-          backgroundColor: AppColors.surfaceCard,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.card),
-          ),
-          title: Row(
-            children: [
-              const Icon(Icons.verified_rounded, color: AppColors.successBorder, size: 28),
-              const SizedBox(width: AppSpacing.sm),
-              Flexible(
-                child: Text(
-                  'Nghiệm Thu Kỳ Học',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Bạn có chắc chắn đã hoàn thành học kỳ ${state.plan.semesterName}?',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Hệ thống sẽ tự động chuyển ${state.courseCount} môn học (${state.totalCredits} TC) '
-                'vào danh mục "Môn Đã Học" (SCR-03) và cộng dồn số tín chỉ tích lũy của bạn '
-                'từ ${state.student.accumulatedCredits} lên ${state.student.accumulatedCredits + state.totalCredits} TC.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-          actionsPadding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(false),
-              child: const Text('Hủy bỏ', style: TextStyle(color: AppColors.textSecondary)),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primaryBlue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.control),
-                ),
-              ),
-              onPressed: () => Navigator.of(dialogCtx).pop(true),
-              child: const Text('Xác nhận hoàn thành'),
-            ),
-          ],
-        );
-      },
+      builder: (dialogCtx) => _CompleteSemesterDialog(state: state),
     );
 
-    if (confirmed == true && context.mounted) {
-      final success = await vm.completeSemester();
+    if (results != null && context.mounted) {
+      final success = await vm.completeSemester(results);
       if (!context.mounted) return;
 
       if (success) {
+        final passedCount = results.where((r) => r.isPassed && r.grade >= 4.0).length;
+        final addedCredits = results
+            .where((r) => r.isPassed && r.grade >= 4.0)
+            .fold<int>(0, (sum, r) => sum + r.course.credits);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              '🎉 Chúc mừng bạn đã hoàn thành kỳ học ${state.plan.semesterName}! Tích lũy đã tăng thêm ${state.totalCredits} TC.',
+              '🎉 Nghiệm thu hoàn tất! Đạt $passedCount/${results.length} môn (+$addedCredits TC).',
             ),
             backgroundColor: AppColors.successBorder,
             duration: const Duration(seconds: 3),
@@ -233,6 +176,7 @@ class _HeroKpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final tuitionFormatted = SemesterSummaryScreen._currencyFormat.format(state.tuitionFee);
 
     return Container(
@@ -788,6 +732,277 @@ class _CompleteSemesterCard extends StatelessWidget {
               ),
               onPressed: (state.isCompleted || state.isCompletingSemester) ? null : onComplete,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hộp thoại Nghiệm thu Học kỳ: Cho phép chọn trạng thái Đạt / Rớt và nhập điểm thang 10 cho từng môn.
+class _CompleteSemesterDialog extends StatefulWidget {
+  final SemesterSummaryState state;
+
+  const _CompleteSemesterDialog({required this.state});
+
+  @override
+  State<_CompleteSemesterDialog> createState() => _CompleteSemesterDialogState();
+}
+
+class _CompleteSemesterDialogState extends State<_CompleteSemesterDialog> {
+  late final Map<String, CourseGradeItem> _items;
+  late final Map<String, TextEditingController> _controllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _items = {};
+    _controllers = {};
+    for (final c in widget.state.plan.selectedCourses) {
+      final defaultGrade = c.selectedGradeTarget == 'A'
+          ? 8.5
+          : (c.selectedGradeTarget == 'B' ? 7.5 : 6.0);
+      _items[c.code] = CourseGradeItem(
+        course: c,
+        isPassed: true,
+        grade: defaultGrade,
+      );
+      _controllers[c.code] = TextEditingController(text: defaultGrade.toStringAsFixed(1));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final ctrl in _controllers.values) {
+      ctrl.dispose();
+    }
+    super.dispose();
+  }
+
+  void _togglePassed(String code, bool passed) {
+    setState(() {
+      final current = _items[code]!;
+      final newGrade = passed
+          ? (current.grade < 4.0 ? 7.5 : current.grade)
+          : (current.grade >= 4.0 ? 3.0 : current.grade);
+      _items[code] = current.copyWith(isPassed: passed, grade: newGrade);
+      _controllers[code]?.text = newGrade.toStringAsFixed(1);
+    });
+  }
+
+  void _onGradeChanged(String code, String value) {
+    final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
+    if (parsed == null) return;
+    final clamped = parsed.clamp(0.0, 10.0);
+    setState(() {
+      final current = _items[code]!;
+      _items[code] = current.copyWith(
+        grade: clamped,
+        isPassed: clamped >= 4.0,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final itemsList = _items.values.toList();
+    final passedCount = itemsList.where((i) => i.isPassed && i.grade >= 4.0).length;
+    final passedCredits = itemsList
+        .where((i) => i.isPassed && i.grade >= 4.0)
+        .fold<int>(0, (sum, i) => sum + i.course.credits);
+
+    final completedEquiv = itemsList
+        .map((i) => CompletedCourseModel(
+              code: i.course.code,
+              name: i.course.name,
+              credits: i.course.credits,
+              grade: i.grade,
+              gradeLetter: GpaCalculator.grade10ToLetter(i.grade),
+              isPassed: i.isPassed && i.grade >= 4.0,
+            ))
+        .toList();
+    final semesterGpa = GpaCalculator.calculateGpa(completedEquiv);
+
+    return AlertDialog(
+      backgroundColor: AppColors.surfaceCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.card),
+      ),
+      title: Row(
+        children: [
+          const Icon(Icons.verified_rounded, color: AppColors.successBorder, size: 28),
+          const SizedBox(width: AppSpacing.sm),
+          Flexible(
+            child: Text(
+              'Nghiệm Thu Kỳ Học',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bạn có chắc chắn đã hoàn thành học kỳ ${widget.state.plan.semesterName}?',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                'Hệ thống sẽ tự động chuyển ${widget.state.courseCount} môn học (${widget.state.totalCredits} TC) '
+                'vào danh mục "Môn Đã Học" (SCR-03). Hãy chọn trạng thái hoàn thành và nhập điểm thang 10 cho từng môn:',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const Divider(),
+              const SizedBox(height: AppSpacing.sm),
+              for (final item in itemsList) ...[
+                _buildCourseItemRow(item, theme),
+                const SizedBox(height: AppSpacing.md),
+              ],
+              const Divider(),
+              const SizedBox(height: AppSpacing.xs),
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.canvasBg,
+                  borderRadius: BorderRadius.circular(AppRadius.control),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Đạt: $passedCount/${itemsList.length} môn (+$passedCredits TC)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    Text(
+                      'GPA kỳ: ${semesterGpa.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actionsPadding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.lg,
+        vertical: AppSpacing.md,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Hủy bỏ', style: TextStyle(color: AppColors.textSecondary)),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.primaryBlue,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.control),
+            ),
+          ),
+          onPressed: () => Navigator.of(context).pop(itemsList),
+          child: const Text('Xác nhận hoàn thành'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCourseItemRow(CourseGradeItem item, ThemeData theme) {
+    final c = item.course;
+    final isPassed = item.isPassed && item.grade >= 4.0;
+    final letter = GpaCalculator.grade10ToLetter(item.grade);
+    final gpa4 = GpaCalculator.grade10ToGpa4(item.grade);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: isPassed ? Colors.transparent : Colors.red.withOpacity(0.05),
+        border: Border.all(
+          color: isPassed ? AppColors.borderStructural : AppColors.dangerBorder.withOpacity(0.5),
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.control),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${c.code} — ${c.name}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              StatusBadge(
+                label: '${c.credits} TC',
+                type: StatusBadgeType.neutral,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Wrap(
+                spacing: 4,
+                children: [
+                  ChoiceChip(
+                    label: const Text('Đạt', style: TextStyle(fontSize: 12)),
+                    selected: isPassed,
+                    selectedColor: AppColors.successBorder.withOpacity(0.2),
+                    onSelected: (val) => _togglePassed(c.code, true),
+                  ),
+                  ChoiceChip(
+                    label: const Text('Rớt', style: TextStyle(fontSize: 12)),
+                    selected: !isPassed,
+                    selectedColor: Colors.red.withOpacity(0.2),
+                    onSelected: (val) => _togglePassed(c.code, false),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              SizedBox(
+                width: 90,
+                child: TextField(
+                  controller: _controllers[c.code],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Điểm (10)',
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (val) => _onGradeChanged(c.code, val),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              StatusBadge(
+                label: isPassed ? '$letter (${gpa4.toStringAsFixed(1)})' : 'F (0.0)',
+                type: isPassed ? StatusBadgeType.success : StatusBadgeType.danger,
+              ),
+            ],
           ),
         ],
       ),

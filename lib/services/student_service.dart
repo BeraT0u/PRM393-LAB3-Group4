@@ -5,6 +5,7 @@ import '../models/course_model.dart';
 import '../models/student_profile_model.dart';
 import '../models/study_plan_model.dart';
 import '../utils/app_logger.dart';
+import '../utils/gpa_calculator.dart';
 import 'database_seeder.dart';
 
 class StudentService {
@@ -24,45 +25,55 @@ class StudentService {
   /// Xác định số thứ tự học kỳ hiện tại của tài khoản dựa trên dữ liệu môn đã học (SCR-03)
   /// VD: Chưa học kỳ nào -> 1 (Học kỳ 1); Đã học xong Kỳ 1 -> 2 (Học kỳ 2)
   static int computeCurrentSemesterIndex(List<CompletedCourseModel> completed) {
-    final maxExistingSemester = completed
+    if (completed.isEmpty) return 1;
+    final maxCompletedSemester = completed
         .map((c) => c.semesterIndex ?? 0)
         .fold<int>(0, (prev, elem) => elem > prev ? elem : prev);
-    return (maxExistingSemester + 1).clamp(1, 9);
+    if (maxCompletedSemester <= 0) return 1;
+    return (maxCompletedSemester + 1).clamp(1, 9);
   }
 
-  /// Tên hiển thị của học kỳ hiện tại (VD: "Học kỳ 1", "Học kỳ 2", ...)
+  /// Trả về tên hiển thị chuẩn cho học kỳ hiện tại (VD: "Học kỳ 1", "Học kỳ 2")
   static String computeCurrentSemesterName(List<CompletedCourseModel> completed) {
     return 'Học kỳ ${computeCurrentSemesterIndex(completed)}';
   }
 
-  /// Khởi tạo hoặc cập nhật hồ sơ tạm thời trong phiên đăng nhập
-  void cacheProfile(StudentProfileModel profile) {
-    _localProfiles[profile.uid] = profile;
-  }
-
-  /// Lấy hồ sơ sinh viên từ Local Cache / Firestore theo UID, hỗ trợ đa Persona hoặc khởi tạo hồ sơ rỗng
+  /// Lấy thông tin sinh viên từ Firestore hoặc bộ nhớ đệm
   Future<StudentProfileModel> getStudentProfile(
     String uid, {
     String? email,
     String? displayName,
     String? photoUrl,
-    bool forceRefresh = false,
   }) async {
-    if (!forceRefresh && _localProfiles.containsKey(uid)) {
-      return _localProfiles[uid]!;
-    }
-
     final ref = _studentsRef;
     if (ref == null) {
-      final resolved = _localProfiles[uid] ??
+      final cached = _localProfiles[uid] ??
           DatabaseSeeder.resolveProfileForUser(
             uid: uid,
             email: email,
             displayName: displayName,
             photoUrl: photoUrl,
           );
-      _localProfiles[uid] = resolved;
-      return resolved;
+      final localDone = _localCompletedCourses[uid];
+      if (localDone != null && localDone.isNotEmpty) {
+        final localCredits = localDone
+            .where((c) => c.isActuallyPassed)
+            .fold<int>(0, (int total, c) => total + c.credits);
+        final localCodes = localDone
+            .where((c) => c.isActuallyPassed)
+            .map((c) => c.code)
+            .toList();
+        final localGpa = GpaCalculator.calculateGpa(localDone);
+        final synced = cached.copyWith(
+          accumulatedCredits: localCredits,
+          passedCourseCodes: localCodes,
+          currentGpa: localGpa,
+        );
+        _localProfiles[uid] = synced;
+        return synced;
+      }
+      _localProfiles[uid] = cached;
+      return cached;
     }
 
     try {
@@ -70,7 +81,7 @@ class StudentService {
       if (doc.exists && doc.data() != null) {
         var loaded = StudentProfileModel.fromMap(doc.data()!, doc.id);
 
-        // Đồng bộ thực tế từ completed_courses trên Firestore & làm sạch dữ liệu giả cũ (nếu có)
+        // Với tài khoản đăng nhập thực tế (không phải seed mẫu), đồng bộ từ completed_courses
         if (uid != DatabaseSeeder.defaultStudent.uid) {
           final completedSnap =
               await ref.doc(uid).collection('completed_courses').get();
@@ -79,9 +90,14 @@ class StudentService {
               .toList();
           _localCompletedCourses[uid] = realCompleted;
 
-          final realCredits =
-              realCompleted.fold<int>(0, (int total, c) => total + c.credits);
-          final realCodes = realCompleted.map((c) => c.code).toList();
+          final realCredits = realCompleted
+              .where((c) => c.isActuallyPassed)
+              .fold<int>(0, (int total, c) => total + c.credits);
+          final realCodes = realCompleted
+              .where((c) => c.isActuallyPassed)
+              .map((c) => c.code)
+              .toList();
+          final realGpa = GpaCalculator.calculateGpa(realCompleted);
 
           final bool hadFakeSeedId = loaded.studentId == 'SE180504' &&
               (loaded.email == null ||
@@ -95,9 +111,11 @@ class StudentService {
             studentId: hadFakeSeedId ? '' : loaded.studentId,
             major: hadFakeSeedId ? '' : loaded.major,
             cohort: hadFakeSeedId ? '' : loaded.cohort,
-            currentGpa: (hadFakeSeedId && realCompleted.isEmpty)
-                ? 0.0
-                : loaded.currentGpa,
+            currentGpa: realCompleted.isNotEmpty
+                ? realGpa
+                : ((hadFakeSeedId && realCompleted.isEmpty)
+                    ? 0.0
+                    : loaded.currentGpa),
             targetGpa: ((hadFakeSeedId || loaded.isNewStudent) &&
                     loaded.targetGpa == 3.50 &&
                     realCompleted.isEmpty)
@@ -135,6 +153,24 @@ class StudentService {
             displayName: displayName,
             photoUrl: photoUrl,
           );
+      final localDone = _localCompletedCourses[uid];
+      if (localDone != null && localDone.isNotEmpty) {
+        final localCredits = localDone
+            .where((c) => c.isActuallyPassed)
+            .fold<int>(0, (int total, c) => total + c.credits);
+        final localCodes = localDone
+            .where((c) => c.isActuallyPassed)
+            .map((c) => c.code)
+            .toList();
+        final localGpa = GpaCalculator.calculateGpa(localDone);
+        final syncedFallback = fallback.copyWith(
+          accumulatedCredits: localCredits,
+          passedCourseCodes: localCodes,
+          currentGpa: localGpa,
+        );
+        _localProfiles[uid] = syncedFallback;
+        return syncedFallback;
+      }
       _localProfiles[uid] = fallback;
       return fallback;
     }
@@ -162,6 +198,12 @@ class StudentService {
             ? current.avatarUrl
             : (avatarUrl ?? current.avatarUrl));
 
+    // GPA hiện tại luôn được tính tự động từ danh sách môn đã học (không cho phép nhập đè)
+    final existingCompleted = await getCompletedCourses(uid);
+    final calculatedCurrentGpa = existingCompleted.isNotEmpty
+        ? GpaCalculator.calculateGpa(existingCompleted)
+        : current.currentGpa;
+
     final updated = current.copyWith(
       fullName: fullName.trim(),
       studentId: studentId.trim().toUpperCase(),
@@ -169,7 +211,7 @@ class StudentService {
       cohort: cohort != null ? cohort.trim() : current.cohort,
       email: email ?? current.email,
       avatarUrl: resolvedAvatar,
-      currentGpa: currentGpa ?? current.currentGpa,
+      currentGpa: calculatedCurrentGpa,
       targetGpa: targetGpa ?? current.targetGpa,
       totalGraduationCredits:
           totalGraduationCredits ?? current.totalGraduationCredits,
@@ -218,9 +260,6 @@ class StudentService {
   }
 
   /// Khai báo thêm môn đã học theo kỳ (SCR-03)
-  /// Kiểm tra 2 điều kiện:
-  /// 1. Tiến trình kỳ: Kỳ N chỉ được thêm nếu Kỳ 1..N-1 đã có môn hoàn thành ("kì 2 phải có kì 1")
-  /// 2. Tiên quyết: Môn thêm vào phải có môn tiên quyết nằm trong các kỳ trước
   Future<void> addCompletedCourse({
     required String uid,
     required int semesterIndex, // 1..9
@@ -248,6 +287,7 @@ class StudentService {
           existingCompleted.any(
             (c) =>
                 c.code == reqCode &&
+                c.isActuallyPassed &&
                 (c.semesterIndex == null || c.semesterIndex! < semesterIndex),
           );
       if (!hasPrereqInPrevSemesters) {
@@ -257,12 +297,15 @@ class StudentService {
       }
     }
 
+    final isPassed = grade >= 4.0;
     final newCompletedCourse = CompletedCourseModel(
       code: course.code,
       name: course.name,
       credits: course.credits,
       semesterIndex: semesterIndex,
       grade: grade,
+      gradeLetter: GpaCalculator.grade10ToLetter(grade),
+      isPassed: isPassed,
     );
 
     // Cập nhật bộ nhớ đệm local ngay lập tức
@@ -272,20 +315,22 @@ class StudentService {
     ];
     _localCompletedCourses[uid] = updatedCompletedList;
 
-    final updatedPassedCodes = <String>{
-      ...profile.passedCourseCodes,
-      course.code,
-    }.toList();
+    final updatedPassedCodes = updatedCompletedList
+        .where((c) => c.isActuallyPassed)
+        .map((c) => c.code)
+        .toSet()
+        .toList();
 
-    final alreadyCounted = profile.passedCourseCodes.contains(course.code) ||
-        existingCompleted.any((c) => c.code == course.code);
-    final updatedCredits = alreadyCounted
-        ? profile.accumulatedCredits
-        : profile.accumulatedCredits + course.credits;
+    final updatedCredits = updatedCompletedList
+        .where((c) => c.isActuallyPassed)
+        .fold<int>(0, (int total, c) => total + c.credits);
+
+    final updatedGpa = GpaCalculator.calculateGpa(updatedCompletedList);
 
     final updatedProfile = profile.copyWith(
       passedCourseCodes: updatedPassedCodes,
       accumulatedCredits: updatedCredits,
+      currentGpa: updatedGpa,
       isNewStudent: false,
     );
     _localProfiles[uid] = updatedProfile;
@@ -305,7 +350,8 @@ class StudentService {
           'name': course.name,
           'credits': course.credits,
           'grade': grade,
-          'gradeLetter': grade >= 8.5 ? 'A' : (grade >= 7.0 ? 'B' : 'C'),
+          'gradeLetter': GpaCalculator.grade10ToLetter(grade),
+          'isPassed': isPassed,
           'semesterIndex': semesterIndex,
           'completedAt': FieldValue.serverTimestamp(),
         };
@@ -314,6 +360,7 @@ class StudentService {
         await ref.doc(uid).set({
           'passedCourseCodes': updatedPassedCodes,
           'accumulatedCredits': updatedCredits,
+          'currentGpa': updatedGpa,
           'isNewStudent': false,
         }, SetOptions(merge: true));
       } catch (e) {
@@ -321,14 +368,15 @@ class StudentService {
       }
     }
 
-    AppLogger.info('Đã thêm môn ${course.code} vào Kỳ $semesterIndex cho $uid (+${course.credits} TC)');
+    AppLogger.info('Đã thêm môn ${course.code} vào Kỳ $semesterIndex cho $uid (+${course.credits} TC, GPA=$updatedGpa)');
   }
 
   /// Nghiệm thu kỳ học từ bản kế hoạch (SCR-07: Nút "✅ Đã Hoàn Thành Kỳ Học")
-  /// Tự động lưu tất cả các môn đã chọn trong kỳ đó thành Đã Hoàn Thành, cộng dồn tín chỉ
+  /// Tự động lưu tất cả các môn đã chọn kèm điểm số và trạng thái Đạt/Rớt do người dùng chọn.
   Future<int> completeSemesterFromPlan({
     required String uid,
     required StudyPlanModel plan,
+    List<CourseGradeItem>? courseGrades,
   }) async {
     if (plan.selectedCourses.isEmpty) return 0;
 
@@ -347,33 +395,51 @@ class StudentService {
     final newPassedCodes = Set<String>.from(profile.passedCourseCodes);
     int addedCredits = 0;
 
-    for (final course in plan.selectedCourses) {
-      final isAlreadyPassed = newPassedCodes.contains(course.code) ||
-          updatedCompletedMap.containsKey(course.code);
+    final Map<String, CourseGradeItem> gradeMap = {
+      if (courseGrades != null)
+        for (final item in courseGrades) item.course.code: item,
+    };
 
-      final defaultGrade = course.selectedGradeTarget == 'A'
+    for (final course in plan.selectedCourses) {
+      final gradeItem = gradeMap[course.code];
+      final bool isPassed = gradeItem?.isPassed ?? true;
+      final double defaultGrade = course.selectedGradeTarget == 'A'
           ? 8.8
           : (course.selectedGradeTarget == 'B' ? 7.5 : 6.0);
+      final double grade = gradeItem?.grade ?? defaultGrade;
+      final String gradeLetter = GpaCalculator.grade10ToLetter(grade);
+
+      final isActuallyPassed = isPassed && grade >= 4.0;
+      final isAlreadyPassed = newPassedCodes.contains(course.code);
 
       updatedCompletedMap[course.code] = CompletedCourseModel(
         code: course.code,
         name: course.name,
         credits: course.credits,
         semesterIndex: targetSemester,
-        grade: defaultGrade,
+        semesterName: plan.semesterName,
+        grade: grade,
+        gradeLetter: gradeLetter,
+        isPassed: isActuallyPassed,
       );
 
-      newPassedCodes.add(course.code);
-      if (!isAlreadyPassed) {
-        addedCredits += course.credits;
+      if (isActuallyPassed) {
+        newPassedCodes.add(course.code);
+        if (!isAlreadyPassed) {
+          addedCredits += course.credits;
+        }
       }
     }
 
-    _localCompletedCourses[uid] = updatedCompletedMap.values.toList();
+    final allCompletedList = updatedCompletedMap.values.toList();
+    _localCompletedCourses[uid] = allCompletedList;
+
+    final updatedGpa = GpaCalculator.calculateGpa(allCompletedList);
 
     final updatedProfile = profile.copyWith(
       accumulatedCredits: profile.accumulatedCredits + addedCredits,
       passedCourseCodes: newPassedCodes.toList(),
+      currentGpa: updatedGpa,
       isNewStudent: false,
     );
     _localProfiles[uid] = updatedProfile;
@@ -397,7 +463,8 @@ class StudentService {
             'name': course.name,
             'credits': course.credits,
             'grade': completedItem.grade,
-            'gradeLetter': course.selectedGradeTarget,
+            'gradeLetter': completedItem.gradeLetter,
+            'isPassed': completedItem.isActuallyPassed,
             'semesterIndex': targetSemester,
             'semesterName': plan.semesterName,
             'completedAt': FieldValue.serverTimestamp(),
@@ -407,6 +474,7 @@ class StudentService {
         batch.set(ref.doc(uid), {
           'accumulatedCredits': updatedProfile.accumulatedCredits,
           'passedCourseCodes': updatedProfile.passedCourseCodes,
+          'currentGpa': updatedProfile.currentGpa,
           'isNewStudent': false,
         }, SetOptions(merge: true));
 
@@ -420,7 +488,7 @@ class StudentService {
 
         await batch.commit();
         AppLogger.info(
-          'Đã nghiệm thu kỳ học ${plan.id} vào Kỳ $targetSemester cho $uid (+$addedCredits TC)',
+          'Đã nghiệm thu kỳ học ${plan.id} vào Kỳ $targetSemester cho $uid (+$addedCredits TC, GPA=$updatedGpa)',
         );
       } catch (e, st) {
         AppLogger.warning('Đã lưu hoàn thành kỳ học ở local, lỗi đồng bộ Firestore: $e');
