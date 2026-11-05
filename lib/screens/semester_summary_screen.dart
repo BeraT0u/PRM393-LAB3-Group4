@@ -178,9 +178,9 @@ class SemesterSummaryScreen extends ConsumerWidget {
       // UC-26: Khôi phục thanh Bottom Navigation Bar 4 tab
       showBottomBar: true,
       currentTabIndex: 0,
-      appBar: const AppTopBar(
+      appBar: AppTopBar(
         title: 'Tổng Kết Kế Hoạch',
-        subtitle: 'SCR-07: Fall 2024 • Lộ trình tối ưu',
+        subtitle: 'SCR-07: ${state.plan.semesterName} • Lộ trình tối ưu',
         showBack: true,
       ),
       body: ListView(

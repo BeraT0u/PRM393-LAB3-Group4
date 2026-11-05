@@ -72,6 +72,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           : fullName
               .substring(0, fullName.length >= 2 ? 2 : 1)
               .toUpperCase();
+      final hasHttpAvatar = widget.profile.avatarUrl != null &&
+          widget.profile.avatarUrl!.startsWith('http');
+      final resolvedAvatar =
+          hasHttpAvatar ? widget.profile.avatarUrl! : avatarInitials;
 
       final updatedProfile = widget.profile.copyWith(
         fullName: fullName,
@@ -79,7 +83,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         major: major,
         cohort: cohort,
         targetGpa: targetGpa.clamp(0.0, 4.0),
-        avatarUrl: avatarInitials,
+        avatarUrl: resolvedAvatar,
         isNewStudent: false,
       );
 
@@ -89,7 +93,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           .updatePersonalInfo(
             fullName: fullName,
             studentId: studentId,
-            avatarUrl: avatarInitials,
+            major: major,
+            cohort: cohort,
+            avatarUrl: resolvedAvatar,
             targetGpa: targetGpa.clamp(0.0, 4.0),
           );
 

@@ -105,11 +105,23 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     // Lấy kế hoạch từ PlanAnalyzerViewModel nếu người dùng đã chọn môn và không có xung đột;
     // nếu kế hoạch đang trống (ví dụ khi mở trực tiếp SCR-07 trong test), dùng gói 5 môn chuẩn.
     final analyzerState = ref.watch(planAnalyzerViewModelProvider);
+    final dynamicSemester = (completedAsync.value != null &&
+            (uid != DatabaseSeeder.defaultStudent.uid ||
+                completedAsync.value!.completed.isNotEmpty))
+        ? completedAsync.value!.currentSemesterName
+        : analyzerState.plan.semesterName;
     StudyPlanModel initialPlan;
 
     if (!analyzerState.hasConflict &&
         analyzerState.plan.selectedCourses.isNotEmpty) {
-      initialPlan = analyzerState.plan.copyWith(isSaved: true);
+      initialPlan = analyzerState.plan.copyWith(
+        semesterName: dynamicSemester,
+        isSaved: true,
+      );
+    } else if (uid != DatabaseSeeder.defaultStudent.uid) {
+      initialPlan = analyzerState.plan.copyWith(
+        semesterName: dynamicSemester,
+      );
     } else {
       initialPlan = DatabaseSeeder.getResolvedPlan(activeStudent.uid);
     }

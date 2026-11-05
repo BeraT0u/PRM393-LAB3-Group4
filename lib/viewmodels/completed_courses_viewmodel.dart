@@ -4,15 +4,22 @@ import '../models/course_model.dart';
 import '../models/student_profile_model.dart';
 import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
+import '../services/student_service.dart';
 import '../utils/app_logger.dart';
 import '../utils/completed_course_rules.dart';
 import 'course_catalog_viewmodel.dart';
 import 'plan_analyzer_viewmodel.dart';
 
-/// Quản lý UID sinh viên đang đăng nhập (mặc định Persona 1, hỗ trợ chuyển đổi đa tài khoản / tài khoản mới).
+/// Quản lý UID sinh viên đang đăng nhập (ưu tiên tài khoản Google đang đăng nhập thực tế).
 class CurrentStudentUidNotifier extends Notifier<String> {
   @override
-  String build() => DatabaseSeeder.defaultStudent.uid;
+  String build() {
+    final currentUser = ref.read(authServiceProvider).currentUser;
+    if (currentUser != null && currentUser.uid.isNotEmpty) {
+      return currentUser.uid;
+    }
+    return DatabaseSeeder.defaultStudent.uid;
+  }
 
   void setUid(String uid) {
     if (state != uid) {
@@ -138,6 +145,13 @@ class CompletedCoursesState {
     }
     return null;
   }
+
+  /// Học kỳ hiện tại dựa trên dữ liệu các môn đã học (VD: Đã học Kỳ 1 -> Học kỳ 2)
+  int get currentSemesterIndex =>
+      StudentService.computeCurrentSemesterIndex(completed);
+
+  String get currentSemesterName =>
+      StudentService.computeCurrentSemesterName(completed);
 }
 
 /// UC-13 / UC-13B: ViewModel của SCR-03 (Môn Đã Học) & Hồ sơ học tập sinh viên.
@@ -220,9 +234,10 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
       final updatedState = await _load(uid: uid, filter: filter);
       state = AsyncData(updatedState);
 
-      // Đồng bộ danh sách môn đã học sang CourseCatalog và PlanAnalyzer
+      // Đồng bộ danh sách môn đã học và học kỳ mới sang CourseCatalog & PlanAnalyzer
       ref.read(planAnalyzerViewModelProvider.notifier).syncPassedCourses(
             updatedState.passedCodes.toList(),
+            semesterName: updatedState.currentSemesterName,
           );
       ref.invalidate(courseCatalogViewModelProvider);
       return null;
@@ -238,6 +253,8 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
   Future<void> updatePersonalInfo({
     required String fullName,
     required String studentId,
+    String? major,
+    String? cohort,
     String? email,
     String? avatarUrl,
     double? currentGpa,
@@ -249,6 +266,8 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
           uid: uid,
           fullName: fullName,
           studentId: studentId,
+          major: major,
+          cohort: cohort,
           email: email,
           avatarUrl: avatarUrl,
           currentGpa: currentGpa,

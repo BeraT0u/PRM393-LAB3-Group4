@@ -350,12 +350,12 @@ class DatabaseSeeder {
       email: email,
       fullName: name,
       studentId: studentId,
-      major: 'Kỹ thuật Phần mềm',
-      cohort: 'K18',
+      major: '',
+      cohort: '',
       accumulatedCredits: 0,
       totalGraduationCredits: 145,
       currentGpa: 0.0,
-      targetGpa: 3.50,
+      targetGpa: 0.0,
       avatarUrl: photoUrl,
       passedCourseCodes: const [],
       notifyLabDeadlines: true,
@@ -392,12 +392,12 @@ class DatabaseSeeder {
   /// Kế hoạch học tập rỗng (0 môn) để người dùng bắt đầu chọn môn thực tế từ đầu
   static StudyPlanModel getEmptyPlan(
     String userId, {
-    String semesterName = 'Fall 2024',
+    String semesterName = 'Học kỳ 1',
     double maxSafeThresholdHours = 25.0,
-    double targetGpa = 3.65,
+    double targetGpa = 0.0,
   }) {
     return StudyPlanModel(
-      id: '${userId}_${semesterName.replaceAll(' ', '')}',
+      id: '${userId}_${semesterName.replaceAll(' ', '_')}',
       userId: userId,
       semesterName: semesterName,
       selectedCourses: const [],

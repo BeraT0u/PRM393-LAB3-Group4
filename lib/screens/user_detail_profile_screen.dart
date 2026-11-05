@@ -99,12 +99,24 @@ class _UserDetailProfileScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoRow(theme, 'Họ và tên', activeProfile.fullName),
+                  _buildInfoRow(
+                    theme,
+                    'Họ và tên',
+                    activeProfile.fullName.trim().isEmpty
+                        ? 'Chưa có thông tin'
+                        : activeProfile.fullName,
+                  ),
                   const Divider(
                     height: AppSpacing.xl,
                     color: AppColors.borderStructural,
                   ),
-                  _buildInfoRow(theme, 'Mã sinh viên', activeProfile.studentId),
+                  _buildInfoRow(
+                    theme,
+                    'Mã sinh viên',
+                    activeProfile.studentId.trim().isEmpty
+                        ? 'Chưa có thông tin'
+                        : activeProfile.studentId,
+                  ),
                   const Divider(
                     height: AppSpacing.xl,
                     color: AppColors.borderStructural,
@@ -112,18 +124,33 @@ class _UserDetailProfileScreenState
                   _buildInfoRow(
                     theme,
                     'Email',
-                    activeProfile.email ?? 'Chưa cập nhật',
+                    (activeProfile.email == null ||
+                            activeProfile.email!.trim().isEmpty)
+                        ? 'Chưa có thông tin'
+                        : activeProfile.email!,
                   ),
                   const Divider(
                     height: AppSpacing.xl,
                     color: AppColors.borderStructural,
                   ),
-                  _buildInfoRow(theme, 'Chuyên ngành', activeProfile.major),
+                  _buildInfoRow(
+                    theme,
+                    'Chuyên ngành',
+                    activeProfile.major.trim().isEmpty
+                        ? 'Chưa có thông tin'
+                        : activeProfile.major,
+                  ),
                   const Divider(
                     height: AppSpacing.xl,
                     color: AppColors.borderStructural,
                   ),
-                  _buildInfoRow(theme, 'Khóa học', activeProfile.cohort),
+                  _buildInfoRow(
+                    theme,
+                    'Khóa học',
+                    activeProfile.cohort.trim().isEmpty
+                        ? 'Chưa có thông tin'
+                        : activeProfile.cohort,
+                  ),
                   const Divider(
                     height: AppSpacing.xl,
                     color: AppColors.borderStructural,
@@ -131,7 +158,7 @@ class _UserDetailProfileScreenState
                   _buildInfoRow(
                     theme,
                     'GPA hiện tại / Mục tiêu',
-                    '${activeProfile.currentGpa.toStringAsFixed(2)} / ${activeProfile.targetGpa.toStringAsFixed(2)}',
+                    '${activeProfile.currentGpa > 0 ? activeProfile.currentGpa.toStringAsFixed(2) : "Chưa có thông tin"} / ${activeProfile.targetGpa > 0 ? activeProfile.targetGpa.toStringAsFixed(2) : "Chưa có thông tin"}',
                   ),
                 ],
               ),

@@ -21,18 +21,26 @@ class PlanService {
   /// Lấy bản kế hoạch đang lưu ở local của sinh viên (hoặc khởi tạo rỗng 0 môn nếu chưa chọn môn nào)
   StudyPlanModel getLocalDraftPlan({
     required String userId,
-    String semester = 'Fall 2024',
+    String? semester,
     double? maxSafeHours,
     double? maxSafeThresholdHours,
   }) {
     final safeHours = maxSafeThresholdHours ?? maxSafeHours ?? 25.0;
     final existing = _localDraftPlans[userId];
     if (existing != null) {
-      return existing.copyWith(maxSafeThresholdHours: safeHours);
+      final resolvedSemester = semester ?? existing.semesterName;
+      final updated = existing.copyWith(
+        id: '${userId}_${resolvedSemester.replaceAll(' ', '_')}',
+        semesterName: resolvedSemester,
+        maxSafeThresholdHours: safeHours,
+      );
+      _localDraftPlans[userId] = updated;
+      return updated;
     }
+    final resolvedSemester = semester ?? 'Học kỳ 1';
     final emptyPlan = DatabaseSeeder.getEmptyPlan(
       userId,
-      semesterName: semester,
+      semesterName: resolvedSemester,
       maxSafeThresholdHours: safeHours,
     );
     _localDraftPlans[userId] = emptyPlan;
@@ -50,7 +58,7 @@ class PlanService {
   /// Xóa trắng kế hoạch cục bộ về 0 môn (khi bắt đầu kỳ mới hoặc sau khi đã hoàn thành kỳ học)
   StudyPlanModel clearLocalDraftPlan(
     String userId, {
-    String semester = 'Fall 2024',
+    String semester = 'Học kỳ 1',
     double maxSafeHours = 25.0,
   }) {
     final empty = DatabaseSeeder.getEmptyPlan(
@@ -65,15 +73,22 @@ class PlanService {
   /// Tải kế hoạch học tập của sinh viên (ưu tiên Local Draft, sau đó kiểm tra Cloud Firestore)
   Future<StudyPlanModel> getStudyPlan({
     required String userId,
-    String semester = 'Fall 2024',
+    String semester = 'Học kỳ 1',
     double maxSafeHours = 25.0,
   }) async {
     final local = _localDraftPlans[userId];
     if (local != null && local.selectedCourses.isNotEmpty) {
-      return local;
+      final updated = local.copyWith(
+        id: '${userId}_${semester.replaceAll(' ', '_')}',
+        semesterName: semester,
+        maxSafeThresholdHours: maxSafeHours,
+      );
+      _localDraftPlans[userId] = updated;
+      return updated;
     }
 
-    final docId = '${userId}_${semester.replaceAll(' ', '')}';
+    final docIdUnderscore = '${userId}_${semester.replaceAll(' ', '_')}';
+    final docIdCompact = '${userId}_${semester.replaceAll(' ', '')}';
     final ref = _plansRef;
     if (ref == null) {
       return getLocalDraftPlan(
@@ -84,20 +99,38 @@ class PlanService {
     }
 
     try {
-      final doc = await ref.doc(docId).get();
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        // Nếu bản kế hoạch đã được đánh dấu hoàn thành kỳ học thì tạo kỳ mới rỗng
-        if (data['isCompleted'] == true) {
-          return getLocalDraftPlan(
-            userId: userId,
-            semester: semester,
-            maxSafeHours: maxSafeHours,
-          );
+      for (final candidateId in [docIdUnderscore, docIdCompact]) {
+        final doc = await ref.doc(candidateId).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data['isCompleted'] != true) {
+            final cloudPlan = StudyPlanModel.fromMap(data, doc.id).copyWith(
+              id: docIdUnderscore,
+              semesterName: semester,
+              isSaved: true,
+            );
+            _localDraftPlans[userId] = cloudPlan;
+            return cloudPlan;
+          }
         }
-        final cloudPlan = StudyPlanModel.fromMap(data, doc.id);
-        _localDraftPlans[userId] = cloudPlan;
-        return cloudPlan;
+      }
+
+      // Tìm bản kế hoạch chưa hoàn thành của userId trên Cloud Firestore
+      final querySnap =
+          await ref.where('userId', isEqualTo: userId).get();
+      for (final d in querySnap.docs) {
+        final data = d.data();
+        if (data['isCompleted'] != true) {
+          final cloudPlan = StudyPlanModel.fromMap(data, d.id).copyWith(
+            id: docIdUnderscore,
+            semesterName: semester,
+            isSaved: true,
+          );
+          if (cloudPlan.selectedCourses.isNotEmpty) {
+            _localDraftPlans[userId] = cloudPlan;
+            return cloudPlan;
+          }
+        }
       }
     } catch (e) {
       AppLogger.warning('Lỗi khi đọc StudyPlan từ Firestore, dùng dữ liệu local: $e');

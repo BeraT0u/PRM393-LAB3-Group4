@@ -2,14 +2,13 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../viewmodels/completed_courses_viewmodel.dart';
 
 /// UC-08: SCR-01 — Login Screen & SCR-01_Loading
-/// Hỗ trợ đăng nhập nhanh với tài khoản hiện tại hoặc chọn tài khoản mẫu / tạo tài khoản sinh viên mới (0 TC).
+/// Đăng nhập bằng tài khoản Google thực tế (mỗi tài khoản mới khởi tạo hồ sơ 0 TC để tự xây dựng lộ trình).
 class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback? onSignInSuccess;
 
@@ -24,13 +23,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
-  late String _selectedUid;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedUid = ref.read(currentStudentUidProvider);
-  }
 
   static const String _googleLogoSvg = '''
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
@@ -47,7 +39,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
-      String uid = _selectedUid;
+      String uid;
       String? email;
       String? displayName;
       String? photoUrl;
@@ -65,12 +57,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         displayName = user.displayName;
         photoUrl = user.photoURL;
       } else {
-        // Fallback môi trường test / offline: khởi tạo tài khoản mới trống
-        if (uid == DatabaseSeeder.defaultStudent.uid) {
-          uid = 'student_google_new';
-          email = 'student.new@fpt.edu.vn';
-          displayName = 'Sinh viên FPT';
-        }
+        // Fallback môi trường widget test (không có Firebase instance)
+        uid = 'student_google_new';
+        email = 'student.new@fpt.edu.vn';
+        displayName = 'Sinh viên mới';
       }
 
       await ref.read(studentServiceProvider).getStudentProfile(
@@ -78,6 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             email: email,
             displayName: displayName,
             photoUrl: photoUrl,
+            forceRefresh: true,
           );
 
       ref.read(currentStudentUidProvider.notifier).setUid(uid);
@@ -105,115 +96,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         );
       }
-    }
-  }
-
-  void _showEmailSignInSheet() {
-    final emailCtrl = TextEditingController();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surfaceCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
-      ),
-      builder: (sheetCtx) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            MediaQuery.of(sheetCtx).viewInsets.bottom + AppSpacing.lg,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Đăng nhập thử nghiệm với Email',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Nhập email sinh viên FPT (hoặc email bất kỳ). Tài khoản mới sẽ bắt đầu với 0 tín chỉ để bạn tự xây dựng lộ trình học tập từ đầu:',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TextField(
-                  controller: emailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Email sinh viên',
-                    hintText: 'VD: hieuntse180999@fpt.edu.vn',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryBlue,
-                      foregroundColor: AppColors.onPrimaryWhite,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () async {
-                      final email = emailCtrl.text.trim();
-                      if (email.isEmpty) return;
-                      Navigator.of(sheetCtx).pop();
-                      await _handleCustomEmailSignIn(email);
-                    },
-                    child: const Text(
-                      'Bắt đầu với tài khoản mới',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _handleCustomEmailSignIn(String email) async {
-    setState(() => _isLoading = true);
-    final clean = email.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-    final uid = 'user_$clean';
-
-    await ref.read(studentServiceProvider).getStudentProfile(
-          uid,
-          email: email,
-        );
-
-    ref.read(currentStudentUidProvider.notifier).setUid(uid);
-    ref.read(analyticsServiceProvider).logLogin(method: 'custom_email');
-    ref.read(analyticsServiceProvider).setUserId(uid);
-
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (widget.onSignInSuccess != null) {
-      widget.onSignInSuccess!();
-    } else {
-      Navigator.pushReplacementNamed(context, '/home');
     }
   }
 
@@ -445,25 +327,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                         ),
                                       ],
                                     ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-
-                        // Đăng nhập email thử nghiệm (Tài khoản trống 0 TC để tự build persona)
-                        TextButton.icon(
-                          onPressed: _isLoading ? null : _showEmailSignInSheet,
-                          icon: const Icon(
-                            Icons.alternate_email_rounded,
-                            size: 16,
-                            color: AppColors.primaryBlue,
-                          ),
-                          label: const Text(
-                            'Đăng nhập với Email khác (Chế độ thử nghiệm)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.primaryBlue,
-                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),

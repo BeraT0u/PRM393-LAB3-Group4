@@ -7,6 +7,7 @@ import '../services/analytics_service.dart';
 import '../services/database_seeder.dart';
 import '../services/plan_service.dart';
 import '../services/service_providers.dart';
+import '../services/student_service.dart';
 import '../utils/grade_target.dart';
 import 'completed_courses_viewmodel.dart';
 import 'course_catalog_viewmodel.dart';
@@ -148,17 +149,61 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
         ...profile.passedCourseCodes,
         ...completed.map((c) => c.code),
       }.toList();
+
+      // Tự động xác định học kỳ hiện tại của tài khoản dựa trên dữ liệu môn đã học (SCR-03)
+      final bool isUnitTestDefaultEmpty =
+          uid == DatabaseSeeder.defaultStudent.uid && completed.isEmpty;
+      final currentSemesterName = isUnitTestDefaultEmpty
+          ? state.plan.semesterName
+          : StudentService.computeCurrentSemesterName(completed);
+
+      final loadedPlan = await _planService.getStudyPlan(
+        userId: uid,
+        semester: currentSemesterName,
+        maxSafeHours: state.maxSafeThresholdHours,
+      );
+
       if (state.plan.userId == uid) {
-        state = state.copyWith(passedCourseCodes: merged);
+        final effectivePlan = state.plan.selectedCourses.isNotEmpty
+            ? state.plan.copyWith(
+                id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
+                semesterName: currentSemesterName,
+              )
+            : loadedPlan.copyWith(
+                semesterName: currentSemesterName,
+                targetGpa: profile.targetGpa > 0
+                    ? profile.targetGpa
+                    : loadedPlan.targetGpa,
+              );
+        _planService.saveLocalDraftPlan(effectivePlan);
+        state = state.copyWith(
+          plan: effectivePlan,
+          passedCourseCodes: merged,
+        );
       }
     } catch (_) {
       // Giữ danh sách mặc định khi offline
     }
   }
 
-  /// Đồng bộ trực tiếp danh sách mã môn đã đạt khi người dùng vừa thêm môn ở SCR-03
-  void syncPassedCourses(List<String> passedCodes) {
-    state = state.copyWith(passedCourseCodes: List<String>.from(passedCodes));
+  /// Đồng bộ trực tiếp danh sách mã môn đã đạt và học kỳ mới khi người dùng vừa thêm môn ở SCR-03
+  void syncPassedCourses(
+    List<String> passedCodes, {
+    String? semesterName,
+  }) {
+    var updatedPlan = state.plan;
+    if (semesterName != null && semesterName.trim().isNotEmpty) {
+      final uid = state.plan.userId;
+      updatedPlan = updatedPlan.copyWith(
+        id: '${uid}_${semesterName.replaceAll(' ', '_')}',
+        semesterName: semesterName,
+      );
+      _planService.saveLocalDraftPlan(updatedPlan);
+    }
+    state = state.copyWith(
+      plan: updatedPlan,
+      passedCourseCodes: List<String>.from(passedCodes),
+    );
   }
 
   /// Tính lại học phí dựa trên tổng tín chỉ (950.000đ / tín chỉ)
@@ -298,9 +343,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
   /// Xóa toàn bộ môn trong kế hoạch để chọn lại từ đầu (0 môn)
   void clearPlan() {
     final uid = ref.read(currentStudentUidProvider);
-    _planService.clearLocalDraftPlan(uid);
+    final completedState = ref.read(completedCoursesViewModelProvider).value;
+    final semester =
+        completedState?.currentSemesterName ?? state.plan.semesterName;
+    _planService.clearLocalDraftPlan(uid, semester: semester);
     final emptyPlan = _planService.getLocalDraftPlan(
       userId: uid,
+      semester: semester,
       maxSafeThresholdHours: state.maxSafeThresholdHours,
     );
     state = state.copyWith(

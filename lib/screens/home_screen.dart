@@ -49,7 +49,20 @@ class HomeScreen extends ConsumerWidget {
 
     final focusCourse = planState.plan.selectedCourses.isNotEmpty
         ? planState.plan.selectedCourses.first
-        : DatabaseSeeder.sampleCourses.first;
+        : null;
+
+    final activeSemester = (completedAsync.value != null &&
+            (uid != DatabaseSeeder.defaultStudent.uid ||
+                completedAsync.value!.completed.isNotEmpty))
+        ? completedAsync.value!.currentSemesterName
+        : planState.plan.semester;
+    final semesterHeader = activeSemester.toLowerCase().startsWith('học kỳ') ||
+            activeSemester.toLowerCase().startsWith('kỳ')
+        ? '📅 Kế hoạch $activeSemester'
+        : '📅 Kế hoạch kỳ $activeSemester';
+    final targetGpaLabel = profile.targetGpa > 0
+        ? profile.targetGpa.toStringAsFixed(2)
+        : 'Chưa có thông tin';
 
     final enableStudyTips = _isStudyTipsEnabled();
 
@@ -145,7 +158,7 @@ class HomeScreen extends ConsumerWidget {
                             style: theme.textTheme.titleMedium,
                           ),
                           Text(
-                            'Tích lũy: ${profile.accumulatedCredits}/${profile.totalGraduationCredits} TC • GPA mục tiêu: ${profile.targetGpa.toStringAsFixed(2)}',
+                            'Tích lũy: ${profile.accumulatedCredits}/${profile.totalGraduationCredits} TC • GPA mục tiêu: $targetGpaLabel',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppColors.textSecondary,
                             ),
@@ -194,7 +207,7 @@ class HomeScreen extends ConsumerWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            '📅 Kế hoạch kỳ ${planState.plan.semester}',
+                            semesterHeader,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.labelMedium?.copyWith(
                               color: AppColors.textSecondary,
@@ -303,103 +316,130 @@ class HomeScreen extends ConsumerWidget {
               ),
               const SizedBox(height: AppSpacing.lg),
 
-              // UC-11: Hero Card Trọng tâm Tuần 8 (Chạm mở chi tiết môn SCR-05)
-              Semantics(
-                button: true,
-                label:
-                    'Trọng tâm Tuần 8 môn ${focusCourse.name}, chạm để xem chi tiết chiến lược môn',
-                child: Material(
-                  color: AppColors.surfaceCard,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    side: const BorderSide(color: AppColors.borderStructural),
-                  ),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                    onTap: () => Navigator.of(context).pushNamed(
-                      '/course-detail',
-                      arguments: focusCourse.code,
+              // UC-11: Hero Card Trọng tâm học tập (Từ các môn thực tế trong kế hoạch hoặc báo chưa có thông tin)
+              if (focusCourse != null)
+                Semantics(
+                  button: true,
+                  label:
+                      'Trọng tâm học tập môn ${focusCourse.name}, chạm để xem chi tiết chiến lược môn',
+                  child: Material(
+                    color: AppColors.surfaceCard,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      side: const BorderSide(color: AppColors.borderStructural),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '🔥 Trọng tâm Tuần 8',
-                                style: theme.textTheme.labelMedium?.copyWith(
-                                  color: AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.successSurface,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadius.pill),
-                                ),
-                                child: Text(
-                                  'Mục tiêu: Điểm ${focusCourse.selectedGradeTarget}',
-                                  style: const TextStyle(
-                                    color: AppColors.successText,
-                                    fontSize: 11,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      onTap: () => Navigator.of(context).pushNamed(
+                        '/course-detail',
+                        arguments: focusCourse.code,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '🔥 Trọng tâm học tập',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: AppColors.textSecondary,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          Text(
-                            '${focusCourse.name} (${focusCourse.code})',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.successSurface,
+                                    borderRadius:
+                                        BorderRadius.circular(AppRadius.pill),
+                                  ),
+                                  child: Text(
+                                    'Mục tiêu: Điểm ${focusCourse.selectedGradeTarget}',
+                                    style: const TextStyle(
+                                      color: AppColors.successText,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            focusCourse.studyTips.isNotEmpty
-                                ? focusCourse.studyTips.first
-                                : 'Hoàn thiện Lab 2 UI/UX và chuẩn bị tích hợp Firebase cho Lab 3.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: const LinearProgressIndicator(
-                              value: 6 / 8,
-                              minHeight: 6,
-                              backgroundColor: AppColors.borderStructural,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppColors.primaryBlue,
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              '${focusCourse.name} (${focusCourse.code})',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              'Tiến độ tự học: 6 / ${_formatHours(focusCourse.plannedSelfStudyHours).replaceAll("h", "")} giờ',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontSize: 11,
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              focusCourse.studyTips.isNotEmpty
+                                  ? focusCourse.studyTips.first
+                                  : 'Chưa có thông tin mô tả chiến lược cho môn học này.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppColors.textSecondary,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: AppSpacing.md),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                'Tự học dự kiến: ${_formatHours(focusCourse.plannedSelfStudyHours)}/tuần',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
+                )
+              else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceCard,
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                    border: Border.all(color: AppColors.borderStructural),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🔥 Trọng tâm học tập',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        'Chưa có thông tin môn học trọng tâm',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Bạn chưa chọn môn học nào trong kế hoạch kỳ này. Hãy thêm môn từ danh mục Tìm Môn để hiển thị trọng tâm học tập.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
               // UC-12: Section Tips học tập (kết hợp Remote Config toggle enable_study_tips)
               if (enableStudyTips) ...[
@@ -420,21 +460,23 @@ class HomeScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                   ]
-                else ...[
-                  _buildTipCard(
-                    context,
-                    subject: 'SWE302',
-                    tip:
-                        'Nắm vững C4 Model trong kiến trúc phần mềm để làm tốt báo cáo Assignment.',
+                else
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(AppSpacing.md),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceCard,
+                      borderRadius: BorderRadius.circular(AppRadius.card),
+                      border: Border.all(color: AppColors.borderStructural),
+                    ),
+                    child: Text(
+                      'Chưa có thông tin gợi ý học tập. Khi bạn thêm các môn học vào kế hoạch, hệ thống sẽ trích xuất gợi ý chiến lược tương ứng từ cơ sở dữ liệu.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _buildTipCard(
-                    context,
-                    subject: 'DBI202',
-                    tip:
-                        'Ôn tập kỹ Stored Procedure và Trigger trước buổi thực hành Lab cuối kỳ.',
-                  ),
-                ],
               ],
             ],
           ),

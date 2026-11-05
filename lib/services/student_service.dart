@@ -21,6 +21,20 @@ class StudentService {
   CollectionReference<Map<String, dynamic>>? get _studentsRef =>
       _firestore?.collection('students');
 
+  /// Xác định số thứ tự học kỳ hiện tại của tài khoản dựa trên dữ liệu môn đã học (SCR-03)
+  /// VD: Chưa học kỳ nào -> 1 (Học kỳ 1); Đã học xong Kỳ 1 -> 2 (Học kỳ 2)
+  static int computeCurrentSemesterIndex(List<CompletedCourseModel> completed) {
+    final maxExistingSemester = completed
+        .map((c) => c.semesterIndex ?? 0)
+        .fold<int>(0, (prev, elem) => elem > prev ? elem : prev);
+    return (maxExistingSemester + 1).clamp(1, 9);
+  }
+
+  /// Tên hiển thị của học kỳ hiện tại (VD: "Học kỳ 1", "Học kỳ 2", ...)
+  static String computeCurrentSemesterName(List<CompletedCourseModel> completed) {
+    return 'Học kỳ ${computeCurrentSemesterIndex(completed)}';
+  }
+
   /// Khởi tạo hoặc cập nhật hồ sơ tạm thời trong phiên đăng nhập
   void cacheProfile(StudentProfileModel profile) {
     _localProfiles[profile.uid] = profile;
@@ -54,12 +68,53 @@ class StudentService {
     try {
       final doc = await ref.doc(uid).get();
       if (doc.exists && doc.data() != null) {
-        final loaded = StudentProfileModel.fromMap(doc.data()!, doc.id);
+        var loaded = StudentProfileModel.fromMap(doc.data()!, doc.id);
+
+        // Đồng bộ thực tế từ completed_courses trên Firestore & làm sạch dữ liệu giả cũ (nếu có)
+        if (uid != DatabaseSeeder.defaultStudent.uid) {
+          final completedSnap =
+              await ref.doc(uid).collection('completed_courses').get();
+          final realCompleted = completedSnap.docs
+              .map((d) => CompletedCourseModel.fromMap(d.data(), d.id))
+              .toList();
+          _localCompletedCourses[uid] = realCompleted;
+
+          final realCredits =
+              realCompleted.fold<int>(0, (int total, c) => total + c.credits);
+          final realCodes = realCompleted.map((c) => c.code).toList();
+
+          final bool hadFakeSeedId = loaded.studentId == 'SE180504' &&
+              (loaded.email == null ||
+                  !loaded.email!.toLowerCase().contains('se180504'));
+
+          loaded = loaded.copyWith(
+            email: email ?? loaded.email,
+            avatarUrl: (photoUrl != null && photoUrl.startsWith('http'))
+                ? photoUrl
+                : loaded.avatarUrl,
+            studentId: hadFakeSeedId ? '' : loaded.studentId,
+            major: hadFakeSeedId ? '' : loaded.major,
+            cohort: hadFakeSeedId ? '' : loaded.cohort,
+            currentGpa: (hadFakeSeedId && realCompleted.isEmpty)
+                ? 0.0
+                : loaded.currentGpa,
+            targetGpa: ((hadFakeSeedId || loaded.isNewStudent) &&
+                    loaded.targetGpa == 3.50 &&
+                    realCompleted.isEmpty)
+                ? 0.0
+                : (hadFakeSeedId ? 0.0 : loaded.targetGpa),
+            accumulatedCredits: realCredits,
+            passedCourseCodes: realCodes,
+            isNewStudent: hadFakeSeedId ? true : loaded.isNewStudent,
+          );
+          await ref.doc(uid).set(loaded.toMap(), SetOptions(merge: true));
+        }
+
         _localProfiles[uid] = loaded;
         return loaded;
       }
 
-      // Xác định hồ sơ phù hợp: Persona Long/Linh/Tuấn hoặc Hồ sơ rỗng cho tài khoản mới
+      // Khởi tạo hồ sơ rỗng cho tài khoản mới
       final profile = DatabaseSeeder.resolveProfileForUser(
         uid: uid,
         email: email,
@@ -90,6 +145,8 @@ class StudentService {
     required String uid,
     required String fullName,
     required String studentId,
+    String? major,
+    String? cohort,
     String? email,
     String? avatarUrl,
     double? currentGpa,
@@ -97,14 +154,25 @@ class StudentService {
     int? totalGraduationCredits,
   }) async {
     final current = await getStudentProfile(uid, email: email);
+    final hasHttpAvatar =
+        current.avatarUrl != null && current.avatarUrl!.startsWith('http');
+    final resolvedAvatar = (avatarUrl != null && avatarUrl.startsWith('http'))
+        ? avatarUrl
+        : (hasHttpAvatar
+            ? current.avatarUrl
+            : (avatarUrl ?? current.avatarUrl));
+
     final updated = current.copyWith(
       fullName: fullName.trim(),
       studentId: studentId.trim().toUpperCase(),
+      major: major != null ? major.trim() : current.major,
+      cohort: cohort != null ? cohort.trim() : current.cohort,
       email: email ?? current.email,
-      avatarUrl: avatarUrl ?? current.avatarUrl,
+      avatarUrl: resolvedAvatar,
       currentGpa: currentGpa ?? current.currentGpa,
       targetGpa: targetGpa ?? current.targetGpa,
-      totalGraduationCredits: totalGraduationCredits ?? current.totalGraduationCredits,
+      totalGraduationCredits:
+          totalGraduationCredits ?? current.totalGraduationCredits,
       isNewStudent: false, // Đã hoàn tất thiết lập thông tin cá nhân
     );
 
