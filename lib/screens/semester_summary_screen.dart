@@ -771,6 +771,8 @@ class _CompleteSemesterDialogState extends State<_CompleteSemesterDialog> {
     final semesterGpa = GpaCalculator.calculateGpa(completedEquiv);
 
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       backgroundColor: AppColors.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
@@ -830,10 +832,14 @@ class _CompleteSemesterDialogState extends State<_CompleteSemesterDialog> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Đạt: $passedCount/${itemsList.length} môn (+$passedCredits TC)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    Flexible(
+                      child: Text(
+                        'Đạt: $passedCount/${itemsList.length} môn (+$passedCredits TC)',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: AppSpacing.sm),
                     Text(
                       'GPA kỳ: ${semesterGpa.toStringAsFixed(2)}',
                       style: const TextStyle(
@@ -881,9 +887,9 @@ class _CompleteSemesterDialogState extends State<_CompleteSemesterDialog> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
-        color: isPassed ? Colors.transparent : Colors.red.withOpacity(0.05),
+        color: isPassed ? Colors.transparent : Colors.red.withValues(alpha: 0.05),
         border: Border.all(
-          color: isPassed ? AppColors.borderStructural : AppColors.dangerBorder.withOpacity(0.5),
+          color: isPassed ? AppColors.borderStructural : AppColors.dangerBorder.withValues(alpha: 0.5),
         ),
         borderRadius: BorderRadius.circular(AppRadius.control),
       ),
@@ -910,43 +916,64 @@ class _CompleteSemesterDialogState extends State<_CompleteSemesterDialog> {
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: AppSpacing.xs,
+            runSpacing: AppSpacing.xs,
             children: [
-              Wrap(
-                spacing: 4,
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   ChoiceChip(
                     label: const Text('Đạt', style: TextStyle(fontSize: 12)),
                     selected: isPassed,
-                    selectedColor: AppColors.successBorder.withOpacity(0.2),
+                    showCheckmark: false,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    selectedColor: AppColors.successBorder.withValues(alpha: 0.2),
                     onSelected: (val) => _togglePassed(c.code, true),
                   ),
+                  const SizedBox(width: 4),
                   ChoiceChip(
                     label: const Text('Rớt', style: TextStyle(fontSize: 12)),
                     selected: !isPassed,
-                    selectedColor: Colors.red.withOpacity(0.2),
+                    showCheckmark: false,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    selectedColor: Colors.red.withValues(alpha: 0.2),
                     onSelected: (val) => _togglePassed(c.code, false),
                   ),
                 ],
               ),
-              const Spacer(),
-              SizedBox(
-                width: 90,
-                child: TextField(
-                  controller: _controllers[c.code],
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(
-                    labelText: 'Điểm (10)',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                    border: OutlineInputBorder(),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 72,
+                    height: 38,
+                    child: TextField(
+                      controller: _controllers[c.code],
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                      decoration: const InputDecoration(
+                        labelText: 'Điểm',
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (val) => _onGradeChanged(c.code, val),
+                    ),
                   ),
-                  onChanged: (val) => _onGradeChanged(c.code, val),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              StatusBadge(
-                label: isPassed ? '$letter (${gpa4.toStringAsFixed(1)})' : 'F (0.0)',
-                type: isPassed ? StatusBadgeType.success : StatusBadgeType.danger,
+                  const SizedBox(width: AppSpacing.xs),
+                  StatusBadge(
+                    label: isPassed ? '$letter (${gpa4.toStringAsFixed(1)})' : 'F (0.0)',
+                    type: isPassed ? StatusBadgeType.success : StatusBadgeType.danger,
+                  ),
+                ],
               ),
             ],
           ),
