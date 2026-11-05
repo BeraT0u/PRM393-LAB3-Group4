@@ -87,31 +87,6 @@ class SemesterSummaryScreen extends ConsumerWidget {
     }
   }
 
-  void _handleSyncCalendar(BuildContext context, WidgetRef ref) {
-    ref.read(semesterSummaryViewModelProvider.notifier).syncGoogleCalendar();
-    final sm = ScaffoldMessenger.of(context);
-    sm.hideCurrentSnackBar();
-    sm.showSnackBar(
-      const SnackBar(
-        content: Text('📅 Đã đồng bộ lịch tự học 26h/tuần của 5 môn học vào Google Calendar!'),
-        backgroundColor: AppColors.primaryBlue,
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _handleShare(BuildContext context) {
-    final sm = ScaffoldMessenger.of(context);
-    sm.hideCurrentSnackBar();
-    sm.showSnackBar(
-      const SnackBar(
-        content: Text('🔗 Đã sao chép liên kết kế hoạch học tập để chia sẻ!'),
-        backgroundColor: AppColors.primaryBlue,
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(semesterSummaryViewModelProvider);
@@ -150,8 +125,6 @@ class SemesterSummaryScreen extends ConsumerWidget {
             state: state,
             theme: theme,
             onExportPdf: () => _handleExportPdf(context, ref),
-            onSyncCalendar: () => _handleSyncCalendar(context, ref),
-            onShare: () => _handleShare(context),
           ),
           const SizedBox(height: AppSpacing.xl),
 
@@ -508,15 +481,11 @@ class _ExportPdfCard extends StatelessWidget {
   final SemesterSummaryState state;
   final ThemeData theme;
   final VoidCallback onExportPdf;
-  final VoidCallback onSyncCalendar;
-  final VoidCallback onShare;
 
   const _ExportPdfCard({
     required this.state,
     required this.theme,
     required this.onExportPdf,
-    required this.onSyncCalendar,
-    required this.onShare,
   });
 
   @override
@@ -592,29 +561,6 @@ class _ExportPdfCard extends StatelessWidget {
             isLoading: state.isGeneratingPdf || state.isUploadingPdf,
             loadingLabel: state.isUploadingPdf ? 'Đang tải lên Cloud...' : 'Đang khởi tạo PDF...',
             onPressed: (state.isGeneratingPdf || state.isUploadingPdf) ? null : onExportPdf,
-          ),
-          const SizedBox(height: AppSpacing.md),
-
-          // Hàng nút phụ: Sync Calendar & Share
-          Row(
-            children: [
-              Expanded(
-                child: AppTonalButton(
-                  label: state.calendarSynced ? 'Đã sync Calendar ✅' : '📅 Sync Calendar',
-                  semanticsLabel: 'Đồng bộ lịch học vào Google Calendar',
-                  onPressed: onSyncCalendar,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: AppTonalButton(
-                  label: '🔗 Chia sẻ',
-                  icon: Icons.share_rounded,
-                  semanticsLabel: 'Chia sẻ liên kết kế hoạch học tập',
-                  onPressed: onShare,
-                ),
-              ),
-            ],
           ),
 
           // Thông báo nếu đã có URL lưu trữ trên Cloud Storage

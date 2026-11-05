@@ -158,7 +158,7 @@ void main() {
       expect(fakePdfService.previewCalled, isTrue);
     });
 
-    testWidgets('UC-30: Đồng bộ Google Calendar và Chia sẻ kế hoạch', (tester) async {
+    testWidgets('Giao diện không còn nút Sync Calendar và Chia sẻ', (tester) async {
       tester.view.physicalSize = const Size(800, 1800);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(() => tester.view.resetPhysicalSize());
@@ -166,14 +166,9 @@ void main() {
       await tester.pumpWidget(buildTestableScreen());
       await tester.pumpAndSettle();
 
-      // Nút Sync Calendar
-      final syncBtn = find.text('📅 Sync Calendar');
-      expect(syncBtn, findsOneWidget);
-      await tester.ensureVisible(syncBtn);
-      await tester.tap(syncBtn);
-      await tester.pumpAndSettle();
-
-      expect(find.textContaining('Google Calendar'), findsOneWidget);
+      // Đảm bảo không còn nút Sync Calendar và nút Chia sẻ
+      expect(find.text('📅 Sync Calendar'), findsNothing);
+      expect(find.text('🔗 Chia sẻ'), findsNothing);
     });
 
     testWidgets('UC-26B: Nghiệm thu kỳ học: Bấm nút mở Dialog và chuyển sang SCR-03', (tester) async {

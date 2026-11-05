@@ -637,7 +637,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // UC-33: Nhóm cài đặt 3 Switch (Nhắc hạn Lab, Cảnh báo quá tải, Sync Calendar)
+            // UC-33: Cài đặt Tự động cảnh báo quá tải học tập
             Material(
               color: AppColors.surfaceCard,
               shape: RoundedRectangleBorder(
@@ -650,74 +650,26 @@ class ProfileScreen extends ConsumerWidget {
                   horizontal: AppSpacing.lg,
                   vertical: AppSpacing.sm,
                 ),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryBlue,
-                      title: const Text(
-                        'Nhắc hạn nộp Lab & Đồ án',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Thông báo tiến độ giờ tự học theo mục tiêu môn',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      value: profile.notifyLabDeadlines,
-                      onChanged: (val) =>
-                          vm.updateSettings(notifyLabDeadlines: val),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: AppColors.primaryBlue,
+                  title: const Text(
+                    'Tự động cảnh báo quá tải học tập',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
-                    const Divider(height: 1, color: AppColors.borderStructural),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryBlue,
-                      title: const Text(
-                        'Tự động cảnh báo quá tải học tập',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Cảnh báo đỏ khi vượt ngưỡng ${planState.maxSafeThresholdHours.toInt()}h/tuần',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      value: profile.autoWarnWorkload,
-                      onChanged: (val) =>
-                          vm.updateSettings(autoWarnWorkload: val),
+                  ),
+                  subtitle: Text(
+                    'Cảnh báo đỏ khi vượt ngưỡng ${planState.maxSafeThresholdHours.toInt()}h/tuần',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
                     ),
-                    const Divider(height: 1, color: AppColors.borderStructural),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryBlue,
-                      title: const Text(
-                        'Đồng bộ Google Calendar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Tự động tạo lịch ôn tập khi lưu kế hoạch kỳ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      value: profile.syncGoogleCalendar,
-                      onChanged: (val) =>
-                          vm.updateSettings(syncGoogleCalendar: val),
-                    ),
-                  ],
+                  ),
+                  value: profile.autoWarnWorkload,
+                  onChanged: (val) =>
+                      vm.updateSettings(autoWarnWorkload: val),
                 ),
               ),
             ),
