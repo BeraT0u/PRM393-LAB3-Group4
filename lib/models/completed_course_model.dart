@@ -48,14 +48,26 @@ class CompletedCourseModel {
     final isPassedVal = map['isPassed'] as bool?;
     final gradeLetter = (map['gradeLetter'] as String?) ??
         (grade != null ? GpaCalculator.grade10ToLetter(grade) : null);
+    final rawSemesterIndex = (map['semesterIndex'] as num?)?.toInt();
+    final semesterName = map['semesterName'] as String?;
+
+    // Ưu tiên số kỳ chuẩn từ semesterName (VD: "Học kỳ 2" -> index 2, tránh lệch kỳ)
+    int? resolvedSemesterIndex = rawSemesterIndex;
+    if (semesterName != null) {
+      final match = RegExp(r'(?:Học kỳ|Kỳ)\s*(\d+)', caseSensitive: false).firstMatch(semesterName);
+      if (match != null) {
+        resolvedSemesterIndex = int.tryParse(match.group(1)!);
+      }
+    }
+
     return CompletedCourseModel(
       code: (map['code'] as String?) ?? docId,
       name: (map['name'] as String?) ?? '',
       credits: (map['credits'] as num?)?.toInt() ?? 0,
       grade: grade,
       gradeLetter: gradeLetter,
-      semesterIndex: (map['semesterIndex'] as num?)?.toInt(),
-      semesterName: map['semesterName'] as String?,
+      semesterIndex: resolvedSemesterIndex,
+      semesterName: semesterName,
       isPassed: isPassedVal ?? (grade == null || grade >= 4.0),
     );
   }

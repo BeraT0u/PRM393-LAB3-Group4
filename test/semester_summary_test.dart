@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:eduplan/models/completed_course_model.dart';
 import 'package:eduplan/models/student_profile_model.dart';
 import 'package:eduplan/models/study_plan_model.dart';
 import 'package:eduplan/screens/semester_summary_screen.dart';
@@ -51,6 +52,16 @@ class _FakeStorageService extends StorageService {
 
 class _FakeStudentService extends StudentService {
   bool markCompletedCalled = false;
+
+  @override
+  Future<int> completeSemesterFromPlan({
+    required String uid,
+    required StudyPlanModel plan,
+    List<CourseGradeItem>? courseGrades,
+  }) async {
+    markCompletedCalled = true;
+    return 15;
+  }
 
   @override
   Future<void> markSemesterPlanCompleted({

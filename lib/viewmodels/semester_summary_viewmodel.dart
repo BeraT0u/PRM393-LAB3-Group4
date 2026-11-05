@@ -223,10 +223,6 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     state = state.copyWith(isCompletingSemester: true, errorMessage: null);
 
     try {
-      await _studentService.markSemesterPlanCompleted(
-        uid: state.student.uid,
-        planId: state.plan.id,
-      );
       final addedCredits = await _studentService.completeSemesterFromPlan(
         uid: state.student.uid,
         plan: state.plan,

@@ -244,6 +244,22 @@ class StudentService {
           .map((d) => CompletedCourseModel.fromMap(d.data(), d.id))
           .toList();
 
+      // Tự động chuẩn hóa dữ liệu nếu có môn bị sai lệch semesterIndex so với semesterName
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final rawIndex = (data['semesterIndex'] as num?)?.toInt();
+        final sName = data['semesterName'] as String?;
+        if (sName != null) {
+          final m = RegExp(r'(?:Học kỳ|Kỳ)\s*(\d+)', caseSensitive: false).firstMatch(sName);
+          final expectedIndex = m != null ? int.tryParse(m.group(1)!) : null;
+          if (expectedIndex != null && expectedIndex != rawIndex) {
+            ref.doc(uid).collection('completed_courses').doc(doc.id).update({
+              'semesterIndex': expectedIndex,
+            }).catchError((_) {});
+          }
+        }
+      }
+
       // Hợp nhất với dữ liệu local nếu có môn vừa thêm
       final localList = _localCompletedCourses[uid] ?? const [];
       final mergedMap = <String, CompletedCourseModel>{
@@ -383,11 +399,17 @@ class StudentService {
     final profile = await getStudentProfile(uid);
     final existingCompleted = await getCompletedCourses(uid);
 
-    // Xác định kỳ học tiếp theo dựa trên các kỳ đã có dữ liệu (Kỳ 1, Kỳ 2, ...)
+    // Xác định kỳ học tiếp theo: ưu tiên index từ plan.semesterName (ví dụ "Học kỳ 2" -> 2)
+    // Nếu plan.semesterName không chứa số kỳ, lấy kỳ cao nhất hiện có + 1.
+    int? plannedSemesterIndex;
+    final match = RegExp(r'(?:Học kỳ|Kỳ)\s*(\d+)', caseSensitive: false).firstMatch(plan.semesterName);
+    if (match != null) {
+      plannedSemesterIndex = int.tryParse(match.group(1)!);
+    }
     final maxExistingSemester = existingCompleted
         .map((c) => c.semesterIndex ?? 0)
         .fold<int>(0, (prev, elem) => elem > prev ? elem : prev);
-    final targetSemester = maxExistingSemester + 1;
+    final targetSemester = plannedSemesterIndex ?? (maxExistingSemester + 1);
 
     final updatedCompletedMap = <String, CompletedCourseModel>{
       for (final c in existingCompleted) c.code: c,
