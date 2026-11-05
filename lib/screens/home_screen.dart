@@ -120,13 +120,20 @@ class HomeScreen extends ConsumerWidget {
                     CircleAvatar(
                       radius: 20,
                       backgroundColor: AppColors.primaryBlueTonal,
-                      child: Text(
-                        profile.avatarInitials,
-                        style: const TextStyle(
-                          color: AppColors.primaryBlue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      backgroundImage: profile.avatarUrl != null &&
+                              profile.avatarUrl!.startsWith('http')
+                          ? NetworkImage(profile.avatarUrl!)
+                          : null,
+                      child: !(profile.avatarUrl != null &&
+                              profile.avatarUrl!.startsWith('http'))
+                          ? Text(
+                              profile.avatarInitials,
+                              style: const TextStyle(
+                                color: AppColors.primaryBlue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            )
+                          : null,
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(

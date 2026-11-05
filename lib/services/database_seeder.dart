@@ -317,20 +317,41 @@ class DatabaseSeeder {
     return resolveProfileForUser(uid: uid);
   }
 
-  /// Khởi tạo hồ sơ rỗng cho tài khoản Google mới chưa định danh
+  /// Khởi tạo hồ sơ rỗng cho tài khoản Google mới (0 TC, 0 môn đã học) để bắt đầu build persona
   static StudentProfileModel getEmptyProfile(
     String uid, {
     String? email,
     String? displayName,
     String? photoUrl,
   }) {
+    // Tự động phân tích MSSV nếu email có định dạng FPT: SE18xxxx, HE18xxxx, DE18xxxx...
+    String studentId = '';
+    if (email != null) {
+      final match = RegExp(r'(se|sa|ss|sb|cs|ia|he|hs|ha|de)\d{5,7}', caseSensitive: false).firstMatch(email);
+      if (match != null) {
+        studentId = match.group(0)!.toUpperCase();
+      }
+    }
+
+    // Tên hiển thị ưu tiên lấy từ Google Display Name hoặc tiền tố email
+    String name = (displayName != null && displayName.trim().isNotEmpty)
+        ? displayName.trim()
+        : '';
+    if (name.isEmpty && email != null && email.contains('@')) {
+      final prefix = email.split('@').first;
+      name = prefix.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ' ').trim();
+    }
+    if (name.isEmpty) {
+      name = 'Sinh viên mới';
+    }
+
     return StudentProfileModel(
       uid: uid,
       email: email,
-      fullName: (displayName != null && displayName.trim().isNotEmpty)
-          ? displayName
-          : 'Sinh viên mới',
-      studentId: '',
+      fullName: name,
+      studentId: studentId,
+      major: 'Kỹ thuật Phần mềm',
+      cohort: 'K18',
       accumulatedCredits: 0,
       totalGraduationCredits: 145,
       currentGpa: 0.0,
@@ -340,47 +361,26 @@ class DatabaseSeeder {
       notifyLabDeadlines: true,
       autoWarnWorkload: true,
       syncGoogleCalendar: false,
-      isNewStudent: true, // Đánh dấu tài khoản cần thiết lập
+      isNewStudent: true, // Đánh dấu tài khoản trống để bắt đầu build persona
     );
   }
 
-  /// Nhận diện hồ sơ phù hợp dựa trên Email hoặc UID người dùng
+  /// Nhận diện hồ sơ sinh viên:
+  /// Cứ mỗi email mới đăng nhập từ Google sẽ là tài khoản trống (0 TC, 0 môn)
+  /// để người dùng bắt đầu build persona từ tài khoản đó.
   static StudentProfileModel resolveProfileForUser({
     required String uid,
     String? email,
     String? displayName,
     String? photoUrl,
   }) {
-    final lowerEmail = (email ?? '').toLowerCase().trim();
-
-    // 1. Khớp Persona 1: Trần Hoàng Long
-    if (lowerEmail.contains('long') || uid == defaultStudent.uid) {
-      return defaultStudent.copyWith(
-        uid: uid,
-        email: email ?? defaultStudent.email,
-        avatarUrl: photoUrl ?? defaultStudent.avatarUrl,
-      );
+    // Chỉ giữ defaultStudent khi uid là defaultStudent.uid và KHÔNG có email truyền vào (phục vụ unit tests)
+    if (uid == defaultStudent.uid && (email == null || email.isEmpty)) {
+      return defaultStudent;
     }
 
-    // 2. Khớp Persona 2: Nguyễn Mai Linh
-    if (lowerEmail.contains('linh') || uid == personaLinh.uid) {
-      return personaLinh.copyWith(
-        uid: uid,
-        email: email ?? personaLinh.email,
-        avatarUrl: photoUrl ?? personaLinh.avatarUrl,
-      );
-    }
-
-    // 3. Khớp Persona 3: Lê Minh Tuấn
-    if (lowerEmail.contains('tuan') || uid == personaTuan.uid) {
-      return personaTuan.copyWith(
-        uid: uid,
-        email: email ?? personaTuan.email,
-        avatarUrl: photoUrl ?? personaTuan.avatarUrl,
-      );
-    }
-
-    // 4. Tài khoản mới hoàn toàn: Khởi tạo hồ sơ rỗng để sinh viên tự điền
+    // Với bất kỳ tài khoản/email nào đăng nhập:
+    // Khởi tạo tài khoản trống (0 TC, 0 môn) để người dùng tự build persona từ đầu
     return getEmptyProfile(
       uid,
       email: email,
