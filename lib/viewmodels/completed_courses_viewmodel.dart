@@ -331,6 +331,25 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     bool? calendarSyncEnabled,
   }) async {
     final uid = ref.read(currentStudentUidProvider);
+    if (autoWarnWorkload != null) {
+      ref
+          .read(planAnalyzerViewModelProvider.notifier)
+          .syncAutoWarnWorkload(autoWarnWorkload);
+    }
+    final optimistic = state.value;
+    if (optimistic != null) {
+      state = AsyncData(
+        optimistic.copyWith(
+          profile: optimistic.profile.copyWith(
+            notifyLabDeadlines:
+                notifyLabDeadlines ?? notificationEnabled ?? optimistic.profile.notifyLabDeadlines,
+            autoWarnWorkload: autoWarnWorkload ?? optimistic.profile.autoWarnWorkload,
+            syncGoogleCalendar:
+                syncGoogleCalendar ?? calendarSyncEnabled ?? optimistic.profile.syncGoogleCalendar,
+          ),
+        ),
+      );
+    }
     final updatedProfile = await ref.read(studentServiceProvider).updateSettings(
           uid: uid,
           notifyLabDeadlines: notifyLabDeadlines ?? notificationEnabled,

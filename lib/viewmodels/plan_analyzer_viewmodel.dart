@@ -16,6 +16,7 @@ class PlanAnalyzerState {
   final StudyPlanModel plan;
   final List<String> passedCourseCodes;
   final double maxSafeThresholdHours;
+  final bool autoWarnWorkload;
   final bool isLoading;
   final bool isSaving;
   final String? errorMessage;
@@ -25,6 +26,7 @@ class PlanAnalyzerState {
     required this.plan,
     this.passedCourseCodes = const ['PRO192', 'MAD101', 'CSD201', 'DBI202', 'MAS291'],
     this.maxSafeThresholdHours = 25.0,
+    this.autoWarnWorkload = true,
     this.isLoading = false,
     this.isSaving = false,
     this.errorMessage,
@@ -32,6 +34,7 @@ class PlanAnalyzerState {
   });
 
   bool get isOverloaded =>
+      autoWarnWorkload &&
       plan.totalSelfStudyHours >
       (hasReplacedConflict ? 26.0 : maxSafeThresholdHours);
 
@@ -73,6 +76,7 @@ class PlanAnalyzerState {
     StudyPlanModel? plan,
     List<String>? passedCourseCodes,
     double? maxSafeThresholdHours,
+    bool? autoWarnWorkload,
     bool? isLoading,
     bool? isSaving,
     String? errorMessage,
@@ -82,6 +86,7 @@ class PlanAnalyzerState {
       plan: plan ?? this.plan,
       passedCourseCodes: passedCourseCodes ?? this.passedCourseCodes,
       maxSafeThresholdHours: maxSafeThresholdHours ?? this.maxSafeThresholdHours,
+      autoWarnWorkload: autoWarnWorkload ?? this.autoWarnWorkload,
       isLoading: isLoading ?? this.isLoading,
       isSaving: isSaving ?? this.isSaving,
       errorMessage: errorMessage,
@@ -116,11 +121,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
         .getLocalDraftPlan(userId: uid, maxSafeThresholdHours: safeHours)
         .copyWith(maxSafeThresholdHours: safeHours);
 
-    final fallbackStudent = DatabaseSeeder.getStudentByUid(uid);
+    final cachedProfile = ref.read(completedCoursesViewModelProvider).value?.profile;
+    final fallbackStudent = cachedProfile ?? DatabaseSeeder.getStudentByUid(uid);
     final initialState = PlanAnalyzerState(
       plan: initialPlan,
       passedCourseCodes: fallbackStudent.passedCourseCodes,
       maxSafeThresholdHours: safeHours,
+      autoWarnWorkload: fallbackStudent.autoWarnWorkload,
     );
 
     if (initialState.hasConflict && initialState.conflictCourse != null) {
@@ -194,6 +201,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
         state = state.copyWith(
           plan: effectivePlan,
           passedCourseCodes: merged,
+          autoWarnWorkload: profile.autoWarnWorkload,
         );
       }
     } catch (_) {
@@ -221,7 +229,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     );
   }
 
-  /// Đồng bộ mục tiêu GPA mới từ SCR-08 sang kế hoạch học tập hiện tại
+  /// Đồng bộ công tắc "Tự động cảnh báo quá tải học tập" từ SCR-08 (UC-33)
+  void syncAutoWarnWorkload(bool enabled) {
+    state = state.copyWith(
+      autoWarnWorkload: enabled,
+      errorMessage: null,
+    );
+  }
   void syncTargetGpa(double targetGpa) {
     if (targetGpa <= 0) return;
     final updatedPlan = state.plan.copyWith(targetGpa: targetGpa);

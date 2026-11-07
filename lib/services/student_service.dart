@@ -106,7 +106,15 @@ class StudentService {
       }
 
       if (doc.exists && doc.data() != null) {
+        final localCached = _localProfiles[uid];
         var loaded = StudentProfileModel.fromMap(doc.data()!, doc.id);
+        if (localCached != null) {
+          loaded = loaded.copyWith(
+            autoWarnWorkload: localCached.autoWarnWorkload,
+            notifyLabDeadlines: localCached.notifyLabDeadlines,
+            syncGoogleCalendar: localCached.syncGoogleCalendar,
+          );
+        }
 
         // Với tài khoản đăng nhập thực tế (không phải seed mẫu), đồng bộ từ completed_courses
         if (uid != DatabaseSeeder.defaultStudent.uid) {
@@ -588,7 +596,7 @@ class StudentService {
     bool? autoWarnWorkload,
     bool? syncGoogleCalendar,
   }) async {
-    final current = await getStudentProfile(uid);
+    final current = _localProfiles[uid] ?? await getStudentProfile(uid);
     final updated = current.copyWith(
       notifyLabDeadlines: notifyLabDeadlines ?? current.notifyLabDeadlines,
       autoWarnWorkload: autoWarnWorkload ?? current.autoWarnWorkload,

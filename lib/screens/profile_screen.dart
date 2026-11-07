@@ -678,9 +678,14 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
-                  value: profile.autoWarnWorkload,
-                  onChanged: (val) =>
-                      vm.updateSettings(autoWarnWorkload: val),
+                  value: planState.autoWarnWorkload,
+                  onChanged: (val) {
+                    ref
+                        .read(planAnalyzerViewModelProvider.notifier)
+                        .syncAutoWarnWorkload(val);
+                    vm.updateSettings(autoWarnWorkload: val);
+                  },
+
                 ),
               ),
             ),

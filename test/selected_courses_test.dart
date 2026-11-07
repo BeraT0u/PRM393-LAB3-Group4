@@ -5,6 +5,7 @@ import 'package:eduplan/services/database_seeder.dart';
 import 'package:eduplan/services/plan_service.dart';
 import 'package:eduplan/services/service_providers.dart';
 import 'package:eduplan/theme/app_theme.dart';
+import 'package:eduplan/viewmodels/plan_analyzer_viewmodel.dart';
 import 'package:eduplan/widgets/course_strategy_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -154,6 +155,56 @@ void main() {
         expect(fakePlanService.savedPlan!.totalSelfStudyHours, 26.0);
 
         // Xác minh đã điều hướng sang SCR-07
+        expect(find.text('SCR-07 Tổng Kết Kế Hoạch'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Khi tắt công tắc Tự động cảnh báo quá tải học tập (autoWarnWorkload = false) thì cho phép lưu kế hoạch vượt 25h',
+      (tester) async {
+        tester.view.physicalSize = const Size(800, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() => tester.view.resetPhysicalSize());
+
+        // Tạo kế hoạch 4 môn đều đạt tiên quyết nhưng tổng giờ = 30h > 25h
+        final courses = DatabaseSeeder.sampleCourses
+            .where((c) => ['PRM393', 'SWE302', 'AIE411', 'SWD392'].contains(c.code))
+            .map((c) => c.copyWith(plannedSelfStudyHours: 10.0))
+            .toList();
+        fakePlanService.saveLocalDraftPlan(
+          StudyPlanModel(
+            id: 'overload_test',
+            userId: DatabaseSeeder.defaultStudent.uid,
+            selectedCourses: courses,
+            updatedAt: DateTime.now(),
+          ),
+        );
+
+        await tester.pumpWidget(buildTestableScreen());
+        await tester.pumpAndSettle();
+
+        // Khi autoWarnWorkload = true (mặc định): Hiện cảnh báo Quá tải và khóa nút Lưu
+        expect(find.text('🔒 Giải quyết 1 xung đột để lưu'), findsOneWidget);
+
+        // Tắt công tắc cảnh báo quá tải (autoWarnWorkload = false)
+        final container = ProviderScope.containerOf(
+          tester.element(find.byType(SelectedCoursesScreen)),
+        );
+        container
+            .read(planAnalyzerViewModelProvider.notifier)
+            .syncAutoWarnWorkload(false);
+        await tester.pumpAndSettle();
+
+        // Không còn báo quá tải, nút Lưu mở khóa và lưu thành công
+        expect(find.text('🔒 Giải quyết 1 xung đột để lưu'), findsNothing);
+        final saveBtn = find.text('Lưu Kế Hoạch Học Tập');
+        expect(saveBtn, findsOneWidget);
+
+        await tester.tap(saveBtn);
+        await tester.pumpAndSettle();
+
+        expect(fakePlanService.savedPlan, isNotNull);
+        expect(fakePlanService.savedPlan!.isSaved, isTrue);
         expect(find.text('SCR-07 Tổng Kết Kế Hoạch'), findsOneWidget);
       },
     );
