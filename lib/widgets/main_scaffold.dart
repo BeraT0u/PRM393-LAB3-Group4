@@ -51,7 +51,15 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: IconButton(
                   padding: EdgeInsets.zero,
                   icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
+                  onPressed: onBack ??
+                      () {
+                        final nav = Navigator.of(context);
+                        if (nav.canPop()) {
+                          nav.pop();
+                        } else {
+                          nav.pushReplacementNamed('/home');
+                        }
+                      },
                 ),
               ),
             ),
@@ -139,12 +147,17 @@ class MainScaffold extends StatelessWidget {
       return;
     }
 
-    if (index == currentTabIndex) return;
-
     final routes = ['/home', '/completed-courses', '/catalog', '/profile'];
-    if (index >= 0 && index < routes.length) {
-      Navigator.of(context).pushReplacementNamed(routes[index]);
+    if (index < 0 || index >= routes.length) return;
+
+    final currentRouteName = ModalRoute.of(context)?.settings.name;
+    if (index == currentTabIndex &&
+        currentTabIndex >= 0 &&
+        currentRouteName == routes[index]) {
+      return;
     }
+
+    Navigator.of(context).pushReplacementNamed(routes[index]);
   }
 
   @override
@@ -152,6 +165,7 @@ class MainScaffold extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isWideScreen = constraints.maxWidth >= 600.0;
+        final bool hasActiveTab = currentTabIndex >= 0 && currentTabIndex <= 3;
 
         final Widget constrainedBody = isWideScreen
             ? Center(
@@ -162,6 +176,66 @@ class MainScaffold extends StatelessWidget {
               )
             : body;
 
+        Widget? bottomNav;
+        if (!isWideScreen && showBottomBar) {
+          final navBar = NavigationBar(
+            selectedIndex: hasActiveTab ? currentTabIndex : 0,
+            indicatorColor:
+                hasActiveTab ? AppColors.primaryBlueTonal : Colors.transparent,
+            onDestinationSelected: (idx) => _handleDefaultTabTap(context, idx),
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(Icons.home_outlined),
+                selectedIcon: Icon(
+                  hasActiveTab ? Icons.home_rounded : Icons.home_outlined,
+                ),
+                label: 'Trang chủ',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.fact_check_outlined),
+                selectedIcon: Icon(Icons.fact_check_rounded),
+                label: 'Đã học',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.search_rounded),
+                selectedIcon: Icon(Icons.search_rounded),
+                label: 'Tìm môn',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.person_outline_rounded),
+                selectedIcon: Icon(Icons.person_rounded),
+                label: 'Cá nhân',
+              ),
+            ],
+          );
+
+          bottomNav = Container(
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppColors.borderStructural, width: 1.0),
+              ),
+            ),
+            child: hasActiveTab
+                ? navBar
+                : NavigationBarTheme(
+                    data: NavigationBarTheme.of(context).copyWith(
+                      indicatorColor: Colors.transparent,
+                      iconTheme: const WidgetStatePropertyAll(
+                        IconThemeData(color: AppColors.textSecondary, size: 24),
+                      ),
+                      labelTextStyle: const WidgetStatePropertyAll(
+                        TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                    child: navBar,
+                  ),
+          );
+        }
+
         return Scaffold(
           backgroundColor: AppColors.canvasBg,
           appBar: appBar,
@@ -170,7 +244,7 @@ class MainScaffold extends StatelessWidget {
               if (isWideScreen && showBottomBar) ...[
                 NavigationRail(
                   backgroundColor: AppColors.surfaceCard,
-                  selectedIndex: currentTabIndex,
+                  selectedIndex: hasActiveTab ? currentTabIndex : null,
                   onDestinationSelected: (idx) => _handleDefaultTabTap(context, idx),
                   labelType: NavigationRailLabelType.all,
                   indicatorColor: AppColors.primaryBlueTonal,
@@ -248,41 +322,7 @@ class MainScaffold extends StatelessWidget {
               ),
             ],
           ),
-          bottomNavigationBar: (!isWideScreen && showBottomBar)
-              ? Container(
-                  decoration: const BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: AppColors.borderStructural, width: 1.0),
-                    ),
-                  ),
-                  child: NavigationBar(
-                    selectedIndex: currentTabIndex,
-                    onDestinationSelected: (idx) => _handleDefaultTabTap(context, idx),
-                    destinations: const [
-                      NavigationDestination(
-                        icon: Icon(Icons.home_outlined),
-                        selectedIcon: Icon(Icons.home_rounded),
-                        label: 'Trang chủ',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.fact_check_outlined),
-                        selectedIcon: Icon(Icons.fact_check_rounded),
-                        label: 'Đã học',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.search_rounded),
-                        selectedIcon: Icon(Icons.search_rounded),
-                        label: 'Tìm môn',
-                      ),
-                      NavigationDestination(
-                        icon: Icon(Icons.person_outline_rounded),
-                        selectedIcon: Icon(Icons.person_rounded),
-                        label: 'Cá nhân',
-                      ),
-                    ],
-                  ),
-                )
-              : null,
+          bottomNavigationBar: bottomNav,
         );
       },
     );

@@ -95,7 +95,7 @@ class SemesterSummaryScreen extends ConsumerWidget {
     return MainScaffold(
       // UC-26: Khôi phục thanh Bottom Navigation Bar 4 tab
       showBottomBar: true,
-      currentTabIndex: 0,
+      currentTabIndex: -1,
       appBar: AppTopBar(
         title: 'Tổng Kết Kế Hoạch',
         subtitle: 'SCR-07: ${state.plan.semesterName} • Lộ trình tối ưu',

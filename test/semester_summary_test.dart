@@ -212,5 +212,17 @@ void main() {
       expect(fakeStudentService.markCompletedCalled, isTrue);
       expect(find.text('SCR-03 Completed Courses'), findsOneWidget);
     });
+
+    testWidgets(
+        'Bấm nút Trang chủ trên thanh điều hướng từ SemesterSummaryScreen chuyển thẳng về Home',
+        (tester) async {
+      await tester.pumpWidget(buildTestableScreen());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Trang chủ'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Home'), findsOneWidget);
+    });
   });
 }

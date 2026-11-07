@@ -49,7 +49,24 @@ class SemesterSummaryState {
   double get totalHours => plan.totalSelfStudyHours;
   int get courseCount => plan.selectedCourses.length;
   double get targetGpa =>
-      plan.targetGpa > 0 ? plan.targetGpa : student.targetGpa;
+      plan.targetGpa > 0
+          ? plan.targetGpa
+          : (student.targetGpa > 0
+              ? student.targetGpa
+              : (plan.selectedCourses.isEmpty
+                  ? 0.0
+                  : plan.selectedCourses.fold<double>(
+                        0.0,
+                        (sum, c) =>
+                            sum +
+                            (c.selectedGradeTarget == 'A'
+                                    ? 4.0
+                                    : (c.selectedGradeTarget == 'B'
+                                        ? 3.0
+                                        : 2.0)) *
+                                c.credits,
+                      ) /
+                      plan.totalCredits));
   int get tuitionFee => plan.tuitionFee;
 
   SemesterSummaryState copyWith({
