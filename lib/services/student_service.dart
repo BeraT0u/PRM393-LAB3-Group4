@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../models/completed_course_model.dart';
 import '../models/course_model.dart';
@@ -14,6 +15,9 @@ class StudentService {
   /// Bộ nhớ đệm cục bộ giúp dữ liệu sinh viên và môn đã học luôn đồng bộ tức thì giữa các màn hình
   final Map<String, StudentProfileModel> _localProfiles = {};
   final Map<String, List<CompletedCourseModel>> _localCompletedCourses = {};
+
+  /// Lấy nhanh hồ sơ sinh viên đã lưu trong bộ nhớ đệm (nếu có)
+  StudentProfileModel? getCachedProfile(String uid) => _localProfiles[uid];
 
   /// Xóa bộ nhớ đệm cục bộ (khi đăng xuất hoặc chuyển đổi tài khoản)
   void clearLocalCache([String? uid]) {
@@ -32,6 +36,75 @@ class StudentService {
 
   CollectionReference<Map<String, dynamic>>? get _studentsRef =>
       _firestore?.collection('students');
+
+  /// Hợp nhất thông tin hồ sơ từ Firestore với bộ nhớ đệm để không bao giờ làm mất thông tin cá nhân đã nhập
+  StudentProfileModel _mergePreservingPersonalInfo(
+    StudentProfileModel loaded,
+    StudentProfileModel? cached, {
+    String? email,
+    String? displayName,
+    String? photoUrl,
+  }) {
+    String resolvedFullName = loaded.fullName.trim();
+    if ((resolvedFullName.isEmpty || resolvedFullName == 'Sinh viên mới') &&
+        cached != null &&
+        cached.fullName.trim().isNotEmpty &&
+        cached.fullName != 'Sinh viên mới') {
+      resolvedFullName = cached.fullName.trim();
+    }
+    if ((resolvedFullName.isEmpty || resolvedFullName == 'Sinh viên mới') &&
+        displayName != null &&
+        displayName.trim().isNotEmpty) {
+      resolvedFullName = displayName.trim();
+    }
+    if (resolvedFullName.isEmpty) {
+      resolvedFullName = loaded.fullName;
+    }
+
+    final resolvedStudentId = loaded.studentId.trim().isNotEmpty
+        ? loaded.studentId.trim()
+        : (cached?.studentId.trim() ?? '');
+    final resolvedMajor = loaded.major.trim().isNotEmpty
+        ? loaded.major.trim()
+        : (cached?.major.trim() ?? '');
+    final resolvedCohort = loaded.cohort.trim().isNotEmpty
+        ? loaded.cohort.trim()
+        : (cached?.cohort.trim() ?? '');
+    final resolvedTargetGpa = loaded.targetGpa > 0
+        ? loaded.targetGpa
+        : (cached != null && cached.targetGpa > 0 ? cached.targetGpa : 0.0);
+
+    final resolvedEmail = (loaded.email != null && loaded.email!.trim().isNotEmpty)
+        ? loaded.email
+        : ((email != null && email.trim().isNotEmpty) ? email : cached?.email);
+
+    final resolvedAvatar = (photoUrl != null && photoUrl.startsWith('http'))
+        ? photoUrl
+        : ((loaded.avatarUrl != null && loaded.avatarUrl!.trim().isNotEmpty)
+            ? loaded.avatarUrl
+            : cached?.avatarUrl);
+
+    return loaded.copyWith(
+      fullName: resolvedFullName,
+      studentId: resolvedStudentId,
+      major: resolvedMajor,
+      cohort: resolvedCohort,
+      targetGpa: resolvedTargetGpa,
+      email: resolvedEmail,
+      avatarUrl: resolvedAvatar,
+      autoWarnWorkload: cached?.autoWarnWorkload ?? loaded.autoWarnWorkload,
+      notifyLabDeadlines:
+          cached?.notifyLabDeadlines ?? loaded.notifyLabDeadlines,
+      syncGoogleCalendar:
+          cached?.syncGoogleCalendar ?? loaded.syncGoogleCalendar,
+      isNewStudent: (resolvedStudentId.isNotEmpty ||
+              resolvedMajor.isNotEmpty ||
+              resolvedCohort.isNotEmpty ||
+              resolvedTargetGpa > 0)
+          ? false
+          : loaded.isNewStudent,
+    );
+  }
 
   /// Xác định số thứ tự học kỳ hiện tại của tài khoản dựa trên dữ liệu môn đã học (SCR-03)
   /// VD: Chưa học kỳ nào -> 1 (Học kỳ 1); Đã học xong Kỳ 1 -> 2 (Học kỳ 2)
@@ -56,6 +129,17 @@ class StudentService {
     String? displayName,
     String? photoUrl,
   }) async {
+    if (Firebase.apps.isNotEmpty) {
+      try {
+        final authUser = FirebaseAuth.instance.currentUser;
+        if (authUser != null && authUser.uid == uid) {
+          email ??= authUser.email;
+          displayName ??= authUser.displayName;
+          photoUrl ??= authUser.photoURL;
+        }
+      } catch (_) {}
+    }
+
     final ref = _studentsRef;
     if (ref == null) {
       final cached = _localProfiles[uid] ??
@@ -93,7 +177,9 @@ class StudentService {
       var doc = await ref.doc(uid).get();
 
       // Nếu chưa có doc theo uid, kiểm tra xem email này đã từng có tài khoản trong hệ thống chưa
-      if ((!doc.exists || doc.data() == null) && email != null && email.trim().isNotEmpty) {
+      if ((!doc.exists || doc.data() == null) &&
+          email != null &&
+          email.trim().isNotEmpty) {
         final normalizedEmail = email.trim().toLowerCase();
         final emailQuery = await ref
             .where('email', isEqualTo: normalizedEmail)
@@ -101,20 +187,21 @@ class StudentService {
             .get();
         if (emailQuery.docs.isNotEmpty) {
           doc = emailQuery.docs.first;
-          AppLogger.info('Đã tìm thấy tài khoản sinh viên qua email: $normalizedEmail (id: \${doc.id})');
+          AppLogger.info(
+            'Đã tìm thấy tài khoản sinh viên qua email: $normalizedEmail (id: ${doc.id})',
+          );
         }
       }
 
       if (doc.exists && doc.data() != null) {
         final localCached = _localProfiles[uid];
-        var loaded = StudentProfileModel.fromMap(doc.data()!, doc.id);
-        if (localCached != null) {
-          loaded = loaded.copyWith(
-            autoWarnWorkload: localCached.autoWarnWorkload,
-            notifyLabDeadlines: localCached.notifyLabDeadlines,
-            syncGoogleCalendar: localCached.syncGoogleCalendar,
-          );
-        }
+        var loaded = _mergePreservingPersonalInfo(
+          StudentProfileModel.fromMap(doc.data()!, doc.id),
+          localCached,
+          email: email,
+          displayName: displayName,
+          photoUrl: photoUrl,
+        );
 
         // Với tài khoản đăng nhập thực tế (không phải seed mẫu), đồng bộ từ completed_courses
         if (uid != DatabaseSeeder.defaultStudent.uid) {
@@ -136,44 +223,92 @@ class StudentService {
           final realCodes = uniquePassed.keys.toList();
           final realGpa = GpaCalculator.calculateGpa(realCompleted);
 
+          // Kiểm tra lại cache lần nữa phòng trường hợp người dùng vừa lưu thông tin cá nhân trong lúc chờ mạng
+          final latestCached = _localProfiles[uid];
+          loaded = _mergePreservingPersonalInfo(
+            loaded,
+            latestCached,
+            email: email,
+            displayName: displayName,
+            photoUrl: photoUrl,
+          );
+
           loaded = loaded.copyWith(
-            email: email ?? loaded.email,
-            avatarUrl: (photoUrl != null && photoUrl.startsWith('http'))
-                ? photoUrl
-                : loaded.avatarUrl,
-            studentId: loaded.studentId,
-            major: loaded.major,
-            cohort: loaded.cohort,
-            currentGpa: realCompleted.isNotEmpty
-                ? realGpa
-                : loaded.currentGpa,
-            targetGpa: loaded.targetGpa,
+            currentGpa:
+                realCompleted.isNotEmpty ? realGpa : loaded.currentGpa,
             accumulatedCredits: realCredits,
             passedCourseCodes: realCodes,
-            isNewStudent: (loaded.studentId.isEmpty && realCompleted.isEmpty),
+            isNewStudent: (loaded.studentId.isEmpty &&
+                loaded.major.isEmpty &&
+                loaded.cohort.isEmpty &&
+                loaded.targetGpa <= 0 &&
+                realCompleted.isEmpty),
           );
-          await ref.doc(uid).set(loaded.toMap(), SetOptions(merge: true));
+
+          _localProfiles[uid] = loaded;
+
+          // Chỉ đồng bộ các trường học thuật tính toán (TUYỆT ĐỐI KHÔNG ghi đè studentId, major, cohort, targetGpa rỗng)
+          final syncUpdates = <String, dynamic>{
+            'accumulatedCredits': realCredits,
+            'passedCourseCodes': realCodes,
+            'isNewStudent': loaded.isNewStudent,
+            if (realCompleted.isNotEmpty) 'currentGpa': realGpa,
+            if (loaded.email != null && loaded.email!.trim().isNotEmpty)
+              'email': loaded.email,
+            if (loaded.avatarUrl != null && loaded.avatarUrl!.trim().isNotEmpty)
+              'avatarUrl': loaded.avatarUrl,
+            if (loaded.fullName.trim().isNotEmpty &&
+                loaded.fullName != 'Sinh viên mới')
+              'fullName': loaded.fullName,
+          };
+          ref.doc(uid).set(syncUpdates, SetOptions(merge: true)).ignore();
+          return loaded;
         }
 
         _localProfiles[uid] = loaded;
         return loaded;
       }
 
-      // Khởi tạo hồ sơ rỗng cho tài khoản mới
-      final profile = DatabaseSeeder.resolveProfileForUser(
-        uid: uid,
+      // Khởi tạo hồ sơ cho tài khoản mới (giữ lại thông tin cá nhân nếu đã có trong cache)
+      final profile = _mergePreservingPersonalInfo(
+        DatabaseSeeder.resolveProfileForUser(
+          uid: uid,
+          email: email,
+          displayName: displayName,
+          photoUrl: photoUrl,
+        ),
+        _localProfiles[uid],
         email: email,
         displayName: displayName,
         photoUrl: photoUrl,
       );
 
       _localProfiles[uid] = profile;
-      await ref.doc(uid).set(profile.toMap());
-      AppLogger.info('Đã tạo hồ sơ cho người dùng $uid (isNew=${profile.isNewStudent})');
+      final initMap = <String, dynamic>{
+        'uid': uid,
+        'fullName': profile.fullName,
+        if (profile.email != null && profile.email!.trim().isNotEmpty)
+          'email': profile.email,
+        if (profile.avatarUrl != null && profile.avatarUrl!.trim().isNotEmpty)
+          'avatarUrl': profile.avatarUrl,
+        if (profile.studentId.trim().isNotEmpty) 'studentId': profile.studentId,
+        if (profile.major.trim().isNotEmpty) 'major': profile.major,
+        if (profile.cohort.trim().isNotEmpty) 'cohort': profile.cohort,
+        if (profile.targetGpa > 0) 'targetGpa': profile.targetGpa,
+        'totalGraduationCredits': profile.totalGraduationCredits,
+        'notifyLabDeadlines': profile.notifyLabDeadlines,
+        'autoWarnWorkload': profile.autoWarnWorkload,
+        'syncGoogleCalendar': profile.syncGoogleCalendar,
+      };
+      ref.doc(uid).set(initMap, SetOptions(merge: true)).ignore();
+      AppLogger.info(
+        'Đã tạo hồ sơ cho người dùng $uid (isNew=${profile.isNewStudent})',
+      );
       return profile;
     } catch (e) {
       AppLogger.warning('Lỗi khi lấy thông tin sinh viên từ Firestore: $e');
-      final fallback = _localProfiles[uid] ??
+      final existingCached = _localProfiles[uid];
+      final fallback = existingCached ??
           DatabaseSeeder.resolveProfileForUser(
             uid: uid,
             email: email,
@@ -182,13 +317,15 @@ class StudentService {
           );
       final localDone = _localCompletedCourses[uid];
       if (localDone != null && localDone.isNotEmpty) {
-        final localCredits = localDone
-            .where((c) => c.isActuallyPassed)
+        final uniquePassed = <String, CompletedCourseModel>{};
+        for (final c in localDone) {
+          if (c.isActuallyPassed) {
+            uniquePassed[c.code] = c;
+          }
+        }
+        final localCredits = uniquePassed.values
             .fold<int>(0, (int total, c) => total + c.credits);
-        final localCodes = localDone
-            .where((c) => c.isActuallyPassed)
-            .map((c) => c.code)
-            .toList();
+        final localCodes = uniquePassed.keys.toList();
         final localGpa = GpaCalculator.calculateGpa(localDone);
         final syncedFallback = fallback.copyWith(
           accumulatedCredits: localCredits,
@@ -216,7 +353,13 @@ class StudentService {
     double? targetGpa,
     int? totalGraduationCredits,
   }) async {
-    final current = await getStudentProfile(uid, email: email);
+    final current = _localProfiles[uid] ??
+        DatabaseSeeder.resolveProfileForUser(
+          uid: uid,
+          email: email,
+          displayName: fullName,
+          photoUrl: avatarUrl,
+        );
     final hasHttpAvatar =
         current.avatarUrl != null && current.avatarUrl!.startsWith('http');
     final resolvedAvatar = (avatarUrl != null && avatarUrl.startsWith('http'))
@@ -225,35 +368,76 @@ class StudentService {
             ? current.avatarUrl
             : (avatarUrl ?? current.avatarUrl));
 
-    // GPA hiện tại luôn được tính tự động từ danh sách môn đã học (không cho phép nhập đè)
-    final existingCompleted = await getCompletedCourses(uid);
-    final calculatedCurrentGpa = existingCompleted.isNotEmpty
-        ? GpaCalculator.calculateGpa(existingCompleted)
-        : current.currentGpa;
+    // GPA hiện tại luôn được tính tự động từ danh sách môn đã học
+    final existingCompleted = _localCompletedCourses[uid];
+    final calculatedCurrentGpa =
+        (existingCompleted != null && existingCompleted.isNotEmpty)
+            ? GpaCalculator.calculateGpa(existingCompleted)
+            : (currentGpa ?? current.currentGpa);
+
+    final cleanName =
+        fullName.trim().isNotEmpty ? fullName.trim() : current.fullName;
+    final cleanStudentId = studentId.trim().isNotEmpty
+        ? studentId.trim().toUpperCase()
+        : current.studentId;
+    final cleanMajor =
+        major != null ? major.trim() : current.major;
+    final cleanCohort =
+        cohort != null ? cohort.trim() : current.cohort;
+    final cleanTargetGpa =
+        (targetGpa != null && targetGpa > 0) ? targetGpa : current.targetGpa;
 
     final updated = current.copyWith(
-      fullName: fullName.trim(),
-      studentId: studentId.trim().toUpperCase(),
-      major: major != null ? major.trim() : current.major,
-      cohort: cohort != null ? cohort.trim() : current.cohort,
+      fullName: cleanName,
+      studentId: cleanStudentId,
+      major: cleanMajor,
+      cohort: cleanCohort,
       email: email ?? current.email,
       avatarUrl: resolvedAvatar,
       currentGpa: calculatedCurrentGpa,
-      targetGpa: targetGpa ?? current.targetGpa,
+      targetGpa: cleanTargetGpa,
       totalGraduationCredits:
           totalGraduationCredits ?? current.totalGraduationCredits,
       isNewStudent: false, // Đã hoàn tất thiết lập thông tin cá nhân
     );
 
+    // Cập nhật bộ nhớ đệm ngay lập tức (0ms) để mọi màn hình và tác vụ đọc song song nhận dữ liệu mới
     _localProfiles[uid] = updated;
 
     final ref = _studentsRef;
     if (ref != null) {
       try {
-        await ref.doc(uid).set(updated.toMap(), SetOptions(merge: true));
-        AppLogger.info('Đã cập nhật thông tin cá nhân cho ${updated.studentId} (${updated.fullName})');
+        final personalMap = <String, dynamic>{
+          'fullName': updated.fullName,
+          'studentId': updated.studentId,
+          'major': updated.major,
+          'cohort': updated.cohort,
+          if (updated.email != null) 'email': updated.email,
+          if (updated.avatarUrl != null) 'avatarUrl': updated.avatarUrl,
+          'targetGpa': updated.targetGpa,
+        };
+        final updates = <String, dynamic>{
+          'uid': uid,
+          ...personalMap,
+          'currentGpa': updated.currentGpa,
+          'totalGraduationCredits': updated.totalGraduationCredits,
+          'isNewStudent': false,
+          'personalInfo': personalMap,
+          'updatedAt': FieldValue.serverTimestamp(),
+        };
+        await ref
+            .doc(uid)
+            .set(updates, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3), onTimeout: () {});
+        AppLogger.info(
+          'Đã cập nhật thông tin cá nhân cho ${updated.studentId} (${updated.fullName}) lên Firebase',
+        );
       } catch (e, st) {
-        AppLogger.error('Lỗi khi cập nhật thông tin cá nhân lên Firestore', e, st);
+        AppLogger.error(
+          'Lỗi khi cập nhật thông tin cá nhân lên Firestore',
+          e,
+          st,
+        );
       }
     }
     return updated;
@@ -263,10 +447,13 @@ class StudentService {
   Future<List<CompletedCourseModel>> getCompletedCourses(String uid) async {
     final ref = _studentsRef;
     if (ref == null) {
-      return List<CompletedCourseModel>.from(_localCompletedCourses[uid] ?? const []);
+      return List<CompletedCourseModel>.from(
+        _localCompletedCourses[uid] ?? const [],
+      );
     }
     try {
-      final snapshot = await ref.doc(uid).collection('completed_courses').get();
+      final snapshot =
+          await ref.doc(uid).collection('completed_courses').get();
       final remoteList = snapshot.docs
           .map((d) => CompletedCourseModel.fromMap(d.data(), d.id))
           .toList();
@@ -277,7 +464,10 @@ class StudentService {
         final rawIndex = (data['semesterIndex'] as num?)?.toInt();
         final sName = data['semesterName'] as String?;
         if (sName != null) {
-          final m = RegExp(r'(?:Học kỳ|Kỳ)\s*(\d+)', caseSensitive: false).firstMatch(sName);
+          final m = RegExp(
+            r'(?:Học kỳ|Kỳ)\s*(\d+)',
+            caseSensitive: false,
+          ).firstMatch(sName);
           final expectedIndex = m != null ? int.tryParse(m.group(1)!) : null;
           if (expectedIndex != null && expectedIndex != rawIndex) {
             ref.doc(uid).collection('completed_courses').doc(doc.id).update({
@@ -290,15 +480,17 @@ class StudentService {
       // Hợp nhất với dữ liệu local nếu có môn vừa thêm
       final localList = _localCompletedCourses[uid] ?? const [];
       final mergedMap = <String, CompletedCourseModel>{
-        for (final c in remoteList) c.code: c,
-        for (final c in localList) c.code: c,
+        for (final c in remoteList) '${c.semesterIndex ?? 0}_${c.code}': c,
+        for (final c in localList) '${c.semesterIndex ?? 0}_${c.code}': c,
       };
       final merged = mergedMap.values.toList();
       _localCompletedCourses[uid] = merged;
       return merged;
     } catch (e) {
       AppLogger.warning('Lỗi khi tải môn đã học của $uid: $e');
-      return List<CompletedCourseModel>.from(_localCompletedCourses[uid] ?? const []);
+      return List<CompletedCourseModel>.from(
+        _localCompletedCourses[uid] ?? const [],
+      );
     }
   }
 
@@ -309,7 +501,7 @@ class StudentService {
     required CourseModel course,
     required double grade,
   }) async {
-    final profile = await getStudentProfile(uid);
+    final profile = _localProfiles[uid] ?? await getStudentProfile(uid);
     final existingCompleted = await getCompletedCourses(uid);
 
     // 1. Kiểm tra ràng buộc tiến trình kỳ học ("kì 2 phải có kì 1")
@@ -326,13 +518,15 @@ class StudentService {
     if (course.prerequisiteCode != null &&
         course.prerequisiteCode!.trim().isNotEmpty) {
       final reqCode = course.prerequisiteCode!.trim();
-      final hasPrereqInPrevSemesters = profile.passedCourseCodes.contains(reqCode) ||
-          existingCompleted.any(
-            (c) =>
-                c.code == reqCode &&
-                c.isActuallyPassed &&
-                (c.semesterIndex == null || c.semesterIndex! < semesterIndex),
-          );
+      final hasPrereqInPrevSemesters =
+          profile.passedCourseCodes.contains(reqCode) ||
+              existingCompleted.any(
+                (c) =>
+                    c.code == reqCode &&
+                    c.isActuallyPassed &&
+                    (c.semesterIndex == null ||
+                        c.semesterIndex! < semesterIndex),
+              );
       if (!hasPrereqInPrevSemesters) {
         throw ArgumentError(
           'Không thể thêm môn ${course.code} vào Kỳ $semesterIndex vì chưa hoàn thành môn tiên quyết $reqCode ở các kỳ trước!',
@@ -373,7 +567,8 @@ class StudentService {
 
     final updatedGpa = GpaCalculator.calculateGpa(updatedCompletedList);
 
-    final updatedProfile = profile.copyWith(
+    final latestProfile = _localProfiles[uid] ?? profile;
+    final updatedProfile = latestProfile.copyWith(
       passedCourseCodes: updatedPassedCodes,
       accumulatedCredits: updatedCredits,
       currentGpa: updatedGpa,
@@ -411,11 +606,15 @@ class StudentService {
           'isNewStudent': false,
         }, SetOptions(merge: true));
       } catch (e) {
-        AppLogger.warning('Đã lưu môn học vào bộ nhớ máy (chờ đồng bộ Cloud): $e');
+        AppLogger.warning(
+          'Đã lưu môn học vào bộ nhớ máy (chờ đồng bộ Cloud): $e',
+        );
       }
     }
 
-    AppLogger.info('Đã thêm môn ${course.code} vào Kỳ $semesterIndex cho $uid (+${course.credits} TC, GPA=$updatedGpa)');
+    AppLogger.info(
+      'Đã thêm môn ${course.code} vào Kỳ $semesterIndex cho $uid (+${course.credits} TC, GPA=$updatedGpa)',
+    );
   }
 
   /// Nghiệm thu kỳ học từ bản kế hoạch (SCR-07: Nút "✅ Đã Hoàn Thành Kỳ Học")
@@ -427,13 +626,16 @@ class StudentService {
   }) async {
     if (plan.selectedCourses.isEmpty) return 0;
 
-    final profile = await getStudentProfile(uid);
+    final profile = _localProfiles[uid] ?? await getStudentProfile(uid);
     final existingCompleted = await getCompletedCourses(uid);
 
     // Xác định kỳ học tiếp theo: ưu tiên index từ plan.semesterName (ví dụ "Học kỳ 2" -> 2)
     // Nếu plan.semesterName không chứa số kỳ, lấy kỳ cao nhất hiện có + 1.
     int? plannedSemesterIndex;
-    final match = RegExp(r'(?:Học kỳ|Kỳ)\s*(\d+)', caseSensitive: false).firstMatch(plan.semesterName);
+    final match = RegExp(
+      r'(?:Học kỳ|Kỳ)\s*(\d+)',
+      caseSensitive: false,
+    ).firstMatch(plan.semesterName);
     if (match != null) {
       plannedSemesterIndex = int.tryParse(match.group(1)!);
     }
@@ -499,7 +701,8 @@ class StudentService {
         .fold<int>(0, (int total, c) => total + c.credits);
     final updatedGpa = GpaCalculator.calculateGpa(allCompletedList);
 
-    final updatedProfile = profile.copyWith(
+    final latestProfile = _localProfiles[uid] ?? profile;
+    final updatedProfile = latestProfile.copyWith(
       accumulatedCredits: allCredits,
       passedCourseCodes: uniquePassed.keys.toList(),
       currentGpa: updatedGpa,
@@ -555,7 +758,9 @@ class StudentService {
           'Đã nghiệm thu kỳ học ${plan.id} vào Kỳ $targetSemester cho $uid (+$addedCredits TC, GPA=$updatedGpa)',
         );
       } catch (e, st) {
-        AppLogger.warning('Đã lưu hoàn thành kỳ học ở local, lỗi đồng bộ Firestore: $e');
+        AppLogger.warning(
+          'Đã lưu hoàn thành kỳ học ở local, lỗi đồng bộ Firestore: $e',
+        );
         AppLogger.error('Chi tiết lỗi completeSemesterFromPlan', e, st);
       }
     }
@@ -582,8 +787,13 @@ class StudentService {
     final ref = _studentsRef;
     if (ref == null) return;
     try {
-      await ref.doc(profile.uid).set(profile.toMap(), SetOptions(merge: true));
-      AppLogger.info('Đã cập nhật hồ sơ sinh viên ${profile.studentId} lên Firestore');
+      await ref
+          .doc(profile.uid)
+          .set(profile.toMap(), SetOptions(merge: true))
+          .timeout(const Duration(seconds: 3), onTimeout: () {});
+      AppLogger.info(
+        'Đã cập nhật hồ sơ sinh viên ${profile.studentId} lên Firestore',
+      );
     } catch (e, st) {
       AppLogger.error('Lỗi khi cập nhật hồ sơ sinh viên', e, st);
     }
@@ -608,11 +818,20 @@ class StudentService {
     if (ref != null) {
       try {
         final updates = <String, dynamic>{};
-        if (notifyLabDeadlines != null) updates['notifyLabDeadlines'] = notifyLabDeadlines;
-        if (autoWarnWorkload != null) updates['autoWarnWorkload'] = autoWarnWorkload;
-        if (syncGoogleCalendar != null) updates['syncGoogleCalendar'] = syncGoogleCalendar;
+        if (notifyLabDeadlines != null) {
+          updates['notifyLabDeadlines'] = notifyLabDeadlines;
+        }
+        if (autoWarnWorkload != null) {
+          updates['autoWarnWorkload'] = autoWarnWorkload;
+        }
+        if (syncGoogleCalendar != null) {
+          updates['syncGoogleCalendar'] = syncGoogleCalendar;
+        }
 
-        await ref.doc(uid).set(updates, SetOptions(merge: true));
+        await ref
+            .doc(uid)
+            .set(updates, SetOptions(merge: true))
+            .timeout(const Duration(seconds: 3), onTimeout: () {});
         AppLogger.info('Đã lưu cài đặt thông báo cho $uid');
       } catch (e) {
         AppLogger.warning('Lỗi khi lưu cài đặt: $e');

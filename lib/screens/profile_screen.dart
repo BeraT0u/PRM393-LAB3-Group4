@@ -35,12 +35,20 @@ class ProfileScreen extends ConsumerWidget {
     WidgetRef ref,
     StudentProfileModel profile,
   ) {
-    final nameCtrl = TextEditingController(text: profile.fullName);
-    final studentIdCtrl = TextEditingController(text: profile.studentId);
-    final majorCtrl = TextEditingController(text: profile.major);
-    final cohortCtrl = TextEditingController(text: profile.cohort);
+    final uid = ref.read(currentStudentUidProvider);
+    final activeProfile =
+        ref.read(completedCoursesViewModelProvider).value?.profile ??
+            ref.read(studentServiceProvider).getCachedProfile(uid) ??
+            profile;
+
+    final nameCtrl = TextEditingController(text: activeProfile.fullName);
+    final studentIdCtrl = TextEditingController(text: activeProfile.studentId);
+    final majorCtrl = TextEditingController(text: activeProfile.major);
+    final cohortCtrl = TextEditingController(text: activeProfile.cohort);
     final targetGpaCtrl = TextEditingController(
-      text: profile.targetGpa > 0 ? profile.targetGpa.toStringAsFixed(2) : '',
+      text: activeProfile.targetGpa > 0
+          ? activeProfile.targetGpa.toStringAsFixed(2)
+          : '',
     );
 
     showModalBottomSheet<void>(
@@ -134,8 +142,8 @@ class ProfileScreen extends ConsumerWidget {
                           border: OutlineInputBorder(),
                         ),
                         child: Text(
-                          profile.currentGpa > 0
-                              ? profile.currentGpa.toStringAsFixed(2)
+                          activeProfile.currentGpa > 0
+                              ? activeProfile.currentGpa.toStringAsFixed(2)
                               : '0.00 (Chưa có môn)',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
@@ -161,15 +169,27 @@ class ProfileScreen extends ConsumerWidget {
                 AppPrimaryButton(
                   label: 'Lưu thông tin cá nhân',
                   onPressed: () async {
-                    final fullName = nameCtrl.text.trim();
+                    final enteredName = nameCtrl.text.trim();
+                    final fullName = enteredName.isNotEmpty
+                        ? enteredName
+                        : activeProfile.fullName.trim();
                     final studentId = studentIdCtrl.text.trim();
                     final major = majorCtrl.text.trim();
                     final cohort = cohortCtrl.text.trim();
-                    final targetGpa =
-                        double.tryParse(targetGpaCtrl.text.trim().replaceAll(',', '.')) ??
-                            profile.targetGpa;
+                    final targetGpa = double.tryParse(
+                          targetGpaCtrl.text.trim().replaceAll(',', '.'),
+                        ) ??
+                        activeProfile.targetGpa;
 
-                    if (fullName.isEmpty || studentId.isEmpty) return;
+                    if (fullName.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Vui lòng nhập họ và tên sinh viên!'),
+                          backgroundColor: AppColors.dangerBorder,
+                        ),
+                      );
+                      return;
+                    }
 
                     final words = fullName.split(RegExp(r'\s+'));
                     final avatarInitials = words.length >= 2
@@ -178,8 +198,8 @@ class ProfileScreen extends ConsumerWidget {
                         : fullName
                             .substring(0, fullName.length >= 2 ? 2 : 1)
                             .toUpperCase();
-                    final hasHttpAvatar = profile.avatarUrl != null &&
-                        profile.avatarUrl!.startsWith('http');
+                    final hasHttpAvatar = activeProfile.avatarUrl != null &&
+                        activeProfile.avatarUrl!.startsWith('http');
 
                     await ref
                         .read(completedCoursesViewModelProvider.notifier)
@@ -189,13 +209,14 @@ class ProfileScreen extends ConsumerWidget {
                           major: major,
                           cohort: cohort,
                           avatarUrl: hasHttpAvatar
-                              ? profile.avatarUrl
+                              ? activeProfile.avatarUrl
                               : avatarInitials,
                           targetGpa: targetGpa.clamp(0.0, 4.0),
                         );
 
                     if (!sheetCtx.mounted) return;
                     Navigator.of(sheetCtx).pop();
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('✅ Đã cập nhật thông tin cá nhân!'),
@@ -397,8 +418,9 @@ class ProfileScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final uid = ref.watch(currentStudentUidProvider);
     final completedAsync = ref.watch(completedCoursesViewModelProvider);
-    final profile =
-        completedAsync.value?.profile ?? DatabaseSeeder.getStudentByUid(uid);
+    final profile = completedAsync.value?.profile ??
+        ref.read(studentServiceProvider).getCachedProfile(uid) ??
+        DatabaseSeeder.getStudentByUid(uid);
     final vm = ref.read(completedCoursesViewModelProvider.notifier);
     final planState = ref.watch(planAnalyzerViewModelProvider);
 
@@ -685,7 +707,6 @@ class ProfileScreen extends ConsumerWidget {
                         .syncAutoWarnWorkload(val);
                     vm.updateSettings(autoWarnWorkload: val);
                   },
-
                 ),
               ),
             ),

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase/firebase_service.dart';
@@ -28,13 +29,23 @@ void main() async {
 class EduPlanApp extends StatelessWidget {
   const EduPlanApp({super.key});
 
+  static String _resolveInitialRoute() {
+    try {
+      if (FirebaseService.isFirebaseInitialized &&
+          FirebaseAuth.instance.currentUser != null) {
+        return '/home';
+      }
+    } catch (_) {}
+    return '/login';
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'EduPlan',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.warmPaperTheme,
-      initialRoute: '/login',
+      initialRoute: _resolveInitialRoute(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/home': (context) => const HomeScreen(),

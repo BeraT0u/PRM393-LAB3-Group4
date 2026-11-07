@@ -119,7 +119,9 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     final uid = ref.watch(currentStudentUidProvider);
     final completedAsync = ref.watch(completedCoursesViewModelProvider);
     final activeStudent =
-        completedAsync.value?.profile ?? DatabaseSeeder.getStudentByUid(uid);
+        completedAsync.value?.profile ??
+        _studentService.getCachedProfile(uid) ??
+        DatabaseSeeder.getStudentByUid(uid);
 
     // Lấy kế hoạch từ PlanAnalyzerViewModel nếu người dùng đã chọn môn và không có xung đột;
     // nếu kế hoạch đang trống (ví dụ khi mở trực tiếp SCR-07 trong test), dùng gói 5 môn chuẩn.

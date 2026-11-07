@@ -122,7 +122,9 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
         .copyWith(maxSafeThresholdHours: safeHours);
 
     final cachedProfile = ref.read(completedCoursesViewModelProvider).value?.profile;
-    final fallbackStudent = cachedProfile ?? DatabaseSeeder.getStudentByUid(uid);
+    final fallbackStudent = cachedProfile ??
+        ref.read(studentServiceProvider).getCachedProfile(uid) ??
+        DatabaseSeeder.getStudentByUid(uid);
     final initialState = PlanAnalyzerState(
       plan: initialPlan,
       passedCourseCodes: fallbackStudent.passedCourseCodes,

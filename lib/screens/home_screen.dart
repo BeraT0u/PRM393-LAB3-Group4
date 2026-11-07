@@ -3,6 +3,7 @@ import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/database_seeder.dart';
+import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../viewmodels/completed_courses_viewmodel.dart';
@@ -43,8 +44,10 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final uid = ref.watch(currentStudentUidProvider);
     final completedAsync = ref.watch(completedCoursesViewModelProvider);
-    final profile =
-        completedAsync.value?.profile ?? DatabaseSeeder.getStudentByUid(uid);
+
+    final profile = completedAsync.value?.profile ??
+        ref.read(studentServiceProvider).getCachedProfile(uid) ??
+        DatabaseSeeder.getStudentByUid(uid);
     final planState = ref.watch(planAnalyzerViewModelProvider);
 
     final focusCourse = planState.plan.selectedCourses.isNotEmpty
@@ -109,8 +112,12 @@ class HomeScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.primaryBlue,
         onRefresh: () async {
-          await ref.read(completedCoursesViewModelProvider.notifier).reload();
-          await ref.read(courseCatalogViewModelProvider.notifier).reload();
+          final completedVm =
+              ref.read(completedCoursesViewModelProvider.notifier);
+          final catalogVm = ref.read(courseCatalogViewModelProvider.notifier);
+          await completedVm.reload();
+          await catalogVm.reload();
+
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),

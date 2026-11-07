@@ -84,7 +84,9 @@ class CompletedCoursesState {
 
   /// GPA tính tự động từ danh sách môn đã hoàn thành
   double get calculatedGpa {
-    final validCourses = completed.where((c) => c.grade != null || c.gradeLetter != null).toList();
+    final validCourses = completed
+        .where((c) => c.grade != null || c.gradeLetter != null)
+        .toList();
     if (validCourses.isNotEmpty) {
       return GpaCalculator.calculateGpa(validCourses);
     }
@@ -155,7 +157,10 @@ class CompletedCoursesState {
     final passed = passedCodes;
     for (final c in catalog) {
       final req = c.prerequisiteCode?.trim();
-      if (req != null && req.isNotEmpty && passed.contains(req) && !passed.contains(c.code)) {
+      if (req != null &&
+          req.isNotEmpty &&
+          passed.contains(req) &&
+          !passed.contains(c.code)) {
         return 'Đã hoàn thành $req → mở khóa ${c.code}';
       }
     }
@@ -188,9 +193,13 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     final catalog = await courseService.getCourses();
 
     final completedCodes = completed.map((c) => c.code).toSet();
-    final legacy = profile.passedCourseCodes.where((c) => !completedCodes.contains(c)).toSet();
+    final legacy = profile.passedCourseCodes
+        .where((c) => !completedCodes.contains(c))
+        .toSet();
 
-    final validCourses = completed.where((c) => c.grade != null || c.gradeLetter != null).toList();
+    final validCourses = completed
+        .where((c) => c.grade != null || c.gradeLetter != null)
+        .toList();
     final realGpa = validCourses.isNotEmpty
         ? GpaCalculator.calculateGpa(validCourses)
         : profile.currentGpa;
@@ -204,7 +213,8 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
         ? uniquePassed.values.fold<int>(0, (int total, c) => total + c.credits)
         : profile.accumulatedCredits;
 
-    final syncedProfile = profile.copyWith(
+    final latestCached = studentService.getCachedProfile(activeUid);
+    final syncedProfile = (latestCached ?? profile).copyWith(
       currentGpa: realGpa,
       accumulatedCredits: realCredits,
     );
@@ -223,8 +233,14 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
   }
 
   Future<void> reload() async {
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(_load);
+    final prev = state.value;
+    if (prev == null) {
+      state = const AsyncLoading();
+    }
+    final next = await AsyncValue.guard(
+      () => _load(filter: prev?.selectedFilter),
+    );
+    state = next;
   }
 
   void selectFilter(String filter) {
@@ -297,7 +313,36 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     int? totalGraduationCredits,
   }) async {
     final uid = ref.read(currentStudentUidProvider);
-    final updatedProfile = await ref.read(studentServiceProvider).updatePersonalInfo(
+    final optimistic = state.value;
+    if (optimistic != null) {
+      final preview = optimistic.profile.copyWith(
+        fullName: fullName.trim().isNotEmpty
+            ? fullName.trim()
+            : optimistic.profile.fullName,
+        studentId: studentId.trim().isNotEmpty
+            ? studentId.trim().toUpperCase()
+            : optimistic.profile.studentId,
+        major: major != null ? major.trim() : optimistic.profile.major,
+        cohort: cohort != null ? cohort.trim() : optimistic.profile.cohort,
+        email: email ?? optimistic.profile.email,
+        avatarUrl: avatarUrl ?? optimistic.profile.avatarUrl,
+        targetGpa: (targetGpa != null && targetGpa > 0)
+            ? targetGpa
+            : optimistic.profile.targetGpa,
+        totalGraduationCredits:
+            totalGraduationCredits ?? optimistic.profile.totalGraduationCredits,
+        isNewStudent: false,
+      );
+      state = AsyncData(optimistic.copyWith(profile: preview));
+    }
+
+    if (targetGpa != null && targetGpa > 0) {
+      ref.read(planAnalyzerViewModelProvider.notifier).syncTargetGpa(targetGpa);
+    }
+
+    final updatedProfile = await ref
+        .read(studentServiceProvider)
+        .updatePersonalInfo(
           uid: uid,
           fullName: fullName,
           studentId: studentId,
@@ -309,10 +354,6 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
           targetGpa: targetGpa,
           totalGraduationCredits: totalGraduationCredits,
         );
-
-    if (targetGpa != null && targetGpa > 0) {
-      ref.read(planAnalyzerViewModelProvider.notifier).syncTargetGpa(targetGpa);
-    }
 
     final current = state.value;
     if (current != null) {
@@ -341,16 +382,21 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
       state = AsyncData(
         optimistic.copyWith(
           profile: optimistic.profile.copyWith(
-            notifyLabDeadlines:
-                notifyLabDeadlines ?? notificationEnabled ?? optimistic.profile.notifyLabDeadlines,
-            autoWarnWorkload: autoWarnWorkload ?? optimistic.profile.autoWarnWorkload,
-            syncGoogleCalendar:
-                syncGoogleCalendar ?? calendarSyncEnabled ?? optimistic.profile.syncGoogleCalendar,
+            notifyLabDeadlines: notifyLabDeadlines ??
+                notificationEnabled ??
+                optimistic.profile.notifyLabDeadlines,
+            autoWarnWorkload:
+                autoWarnWorkload ?? optimistic.profile.autoWarnWorkload,
+            syncGoogleCalendar: syncGoogleCalendar ??
+                calendarSyncEnabled ??
+                optimistic.profile.syncGoogleCalendar,
           ),
         ),
       );
     }
-    final updatedProfile = await ref.read(studentServiceProvider).updateSettings(
+    final updatedProfile = await ref
+        .read(studentServiceProvider)
+        .updateSettings(
           uid: uid,
           notifyLabDeadlines: notifyLabDeadlines ?? notificationEnabled,
           autoWarnWorkload: autoWarnWorkload,

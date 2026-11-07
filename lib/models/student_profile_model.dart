@@ -105,7 +105,7 @@ class StudentProfileModel {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'uid': uid,
       'fullName': fullName,
       'studentId': studentId,
@@ -123,29 +123,69 @@ class StudentProfileModel {
       'syncGoogleCalendar': syncGoogleCalendar,
       'isNewStudent': isNewStudent,
     };
+    if (studentId.trim().isNotEmpty ||
+        major.trim().isNotEmpty ||
+        cohort.trim().isNotEmpty ||
+        targetGpa > 0) {
+      map['personalInfo'] = {
+        'fullName': fullName,
+        'studentId': studentId,
+        'email': email,
+        'major': major,
+        'cohort': cohort,
+        'targetGpa': targetGpa,
+        'avatarUrl': avatarUrl,
+      };
+    }
+    return map;
   }
 
   factory StudentProfileModel.fromMap(Map<String, dynamic> map, String docId) {
+    final personal = map['personalInfo'] is Map
+        ? Map<String, dynamic>.from(map['personalInfo'] as Map)
+        : const <String, dynamic>{};
+
+    String pickNonEmpty(String key) {
+      final top = (map[key] as String?)?.trim() ?? '';
+      if (top.isNotEmpty) return top;
+      return (personal[key] as String?)?.trim() ?? '';
+    }
+
+    final topTargetGpa = (map['targetGpa'] as num?)?.toDouble() ?? 0.0;
+    final backupTargetGpa = (personal['targetGpa'] as num?)?.toDouble() ?? 0.0;
+    final resolvedTargetGpa =
+        topTargetGpa > 0 ? topTargetGpa : backupTargetGpa;
+
+    final resolvedStudentId = pickNonEmpty('studentId');
+    final resolvedMajor = pickNonEmpty('major');
+    final resolvedCohort = pickNonEmpty('cohort');
+
     return StudentProfileModel(
       uid: docId,
-      fullName: (map['fullName'] as String?) ?? '',
-      studentId: (map['studentId'] as String?) ?? '',
-      email: map['email'] as String?,
-      major: (map['major'] as String?) ?? '',
-      cohort: (map['cohort'] as String?) ?? '',
+      fullName: pickNonEmpty('fullName'),
+      studentId: resolvedStudentId,
+      email: (map['email'] as String?) ?? (personal['email'] as String?),
+      major: resolvedMajor,
+      cohort: resolvedCohort,
       accumulatedCredits: (map['accumulatedCredits'] as num?)?.toInt() ?? 0,
       totalGraduationCredits:
           (map['totalGraduationCredits'] as num?)?.toInt() ?? 145,
       currentGpa: (map['currentGpa'] as num?)?.toDouble() ?? 0.0,
-      targetGpa: (map['targetGpa'] as num?)?.toDouble() ?? 0.0,
-      avatarUrl: map['avatarUrl'] as String?,
+      targetGpa: resolvedTargetGpa,
+      avatarUrl:
+          (map['avatarUrl'] as String?) ?? (personal['avatarUrl'] as String?),
       passedCourseCodes: List<String>.from(
         map['passedCourseCodes'] ?? const <String>[],
       ),
       notifyLabDeadlines: map['notifyLabDeadlines'] ?? true,
       autoWarnWorkload: map['autoWarnWorkload'] ?? true,
       syncGoogleCalendar: map['syncGoogleCalendar'] ?? false,
-      isNewStudent: map['isNewStudent'] ?? false,
+      isNewStudent: (resolvedStudentId.isNotEmpty ||
+              resolvedMajor.isNotEmpty ||
+              resolvedCohort.isNotEmpty ||
+              resolvedTargetGpa > 0)
+          ? false
+          : (map['isNewStudent'] ?? false),
     );
   }
 }
