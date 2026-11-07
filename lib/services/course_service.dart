@@ -7,6 +7,19 @@ import 'database_seeder.dart';
 
 class CourseService {
   final FirebaseFirestore? _firestore;
+  final Set<String> _favoriteCourseCodes = {};
+
+  bool isFavorite(String courseCode) => _favoriteCourseCodes.contains(courseCode);
+
+  bool toggleFavorite(String courseCode) {
+    if (_favoriteCourseCodes.contains(courseCode)) {
+      _favoriteCourseCodes.remove(courseCode);
+      return false;
+    } else {
+      _favoriteCourseCodes.add(courseCode);
+      return true;
+    }
+  }
 
   CourseService({FirebaseFirestore? firestore})
       : _firestore = firestore ??

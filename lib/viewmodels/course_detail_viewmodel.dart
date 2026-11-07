@@ -4,6 +4,7 @@ import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
 import '../utils/grade_target.dart';
 import 'completed_courses_viewmodel.dart' show currentStudentUidProvider;
+import 'plan_analyzer_viewmodel.dart';
 
 /// Trạng thái dữ liệu của SCR-05 (Course Strategy).
 class CourseDetailState {
@@ -106,7 +107,17 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
 
     return CourseDetailState(
       course: course,
-      target: GradeTargetOption.fromCode(course.selectedGradeTarget),
+      target: GradeTargetOption.fromCode(
+        ref
+                .read(planAnalyzerViewModelProvider)
+                .plan
+                .selectedCourses
+                .cast<CourseModel?>()
+                .firstWhere((c) => c?.code == courseCode, orElse: () => null)
+                ?.selectedGradeTarget ??
+            course.selectedGradeTarget,
+      ),
+      isFavorite: ref.read(courseServiceProvider).isFavorite(course.code),
       prerequisiteMet: prerequisiteMet,
       isAlreadyPassed: isAlreadyPassed,
     );
@@ -132,7 +143,9 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
   void toggleFavorite() {
     final current = state.value;
     if (current == null) return;
-    state = AsyncData(current.copyWith(isFavorite: !current.isFavorite));
+    final nextFav =
+        ref.read(courseServiceProvider).toggleFavorite(current.course.code);
+    state = AsyncData(current.copyWith(isFavorite: nextFav));
   }
 }
 

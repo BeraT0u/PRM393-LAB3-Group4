@@ -180,7 +180,7 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     try {
       // 1. Sinh file PDF Blueprint chuẩn A4 (UC-28)
       final bytes = await _pdfReportService.generatePlanPdf(
-        plan: state.plan,
+        plan: state.plan.copyWith(targetGpa: state.targetGpa),
         student: state.student,
       );
 
@@ -249,7 +249,7 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     try {
       final addedCredits = await _studentService.completeSemesterFromPlan(
         uid: state.student.uid,
-        plan: state.plan,
+        plan: state.plan.copyWith(targetGpa: state.targetGpa),
         courseGrades: courseGrades,
       );
 

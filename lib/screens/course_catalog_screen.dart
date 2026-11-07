@@ -259,6 +259,7 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
       currentTabIndex: 2,
       appBar: AppTopBar(
         title: 'Tìm Môn',
+        showBack: Navigator.of(context).canPop(),
         actions: [
           if (planState.courseCount > 0)
             Padding(

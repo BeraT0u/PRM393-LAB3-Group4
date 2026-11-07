@@ -32,7 +32,9 @@ class _UserDetailProfileScreenState
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(profile: _profile),
+        builder: (context) => EditProfileScreen(
+          profile: ref.read(completedCoursesViewModelProvider).value?.profile ?? _profile,
+        ),
       ),
     );
 

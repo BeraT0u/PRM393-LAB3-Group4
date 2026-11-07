@@ -166,7 +166,7 @@ class ProfileScreen extends ConsumerWidget {
                     final major = majorCtrl.text.trim();
                     final cohort = cohortCtrl.text.trim();
                     final targetGpa =
-                        double.tryParse(targetGpaCtrl.text.trim()) ??
+                        double.tryParse(targetGpaCtrl.text.trim().replaceAll(',', '.')) ??
                             profile.targetGpa;
 
                     if (fullName.isEmpty || studentId.isEmpty) return;
@@ -628,7 +628,7 @@ class ProfileScreen extends ConsumerWidget {
                     height: AppSpacing.minTouchTarget,
                     child: TextButton(
                       onPressed: () {
-                        if (planState.courseCount > 0) {
+                        if (planState.courseCount > 0 && !planState.hasConflict) {
                           Navigator.of(context).pushNamed('/summary');
                         } else {
                           Navigator.of(context).pushNamed('/plan-analyzer');

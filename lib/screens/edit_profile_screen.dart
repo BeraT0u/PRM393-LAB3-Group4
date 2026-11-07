@@ -63,7 +63,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final major = _majorController.text.trim();
       final cohort = _cohortController.text.trim();
       final targetGpa =
-          double.tryParse(_targetGpaController.text.trim()) ??
+          double.tryParse(_targetGpaController.text.trim().replaceAll(',', '.')) ??
               widget.profile.targetGpa;
 
       final words = fullName.split(RegExp(r'\s+'));
