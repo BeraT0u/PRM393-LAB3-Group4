@@ -9,7 +9,9 @@ import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../viewmodels/completed_courses_viewmodel.dart';
+import '../viewmodels/course_catalog_viewmodel.dart';
 import '../viewmodels/plan_analyzer_viewmodel.dart';
+import '../viewmodels/semester_summary_viewmodel.dart';
 import '../widgets/widgets.dart';
 import 'user_detail_profile_screen.dart';
 
@@ -370,9 +372,12 @@ class ProfileScreen extends ConsumerWidget {
               await ref.read(authServiceProvider).signOut();
 
               // Xóa toàn bộ cache phiên làm việc và reset state giữa các tài khoản
+              ref.read(courseCatalogViewModelProvider.notifier).clearFilters();
               ref.read(currentStudentUidProvider.notifier).clear();
               ref.invalidate(completedCoursesViewModelProvider);
+              ref.invalidate(courseCatalogViewModelProvider);
               ref.invalidate(planAnalyzerViewModelProvider);
+              ref.invalidate(semesterSummaryViewModelProvider);
 
               if (!context.mounted) return;
               Navigator.of(context).pushNamedAndRemoveUntil(

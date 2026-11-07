@@ -48,7 +48,8 @@ class SemesterSummaryState {
   int get totalCredits => plan.totalCredits;
   double get totalHours => plan.totalSelfStudyHours;
   int get courseCount => plan.selectedCourses.length;
-  double get targetGpa => plan.targetGpa;
+  double get targetGpa =>
+      plan.targetGpa > 0 ? plan.targetGpa : student.targetGpa;
   int get tuitionFee => plan.tuitionFee;
 
   SemesterSummaryState copyWith({
@@ -117,11 +118,17 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
         analyzerState.plan.selectedCourses.isNotEmpty) {
       initialPlan = analyzerState.plan.copyWith(
         semesterName: dynamicSemester,
+        targetGpa: activeStudent.targetGpa > 0
+            ? activeStudent.targetGpa
+            : analyzerState.plan.targetGpa,
         isSaved: true,
       );
     } else if (uid != DatabaseSeeder.defaultStudent.uid) {
       initialPlan = analyzerState.plan.copyWith(
         semesterName: dynamicSemester,
+        targetGpa: activeStudent.targetGpa > 0
+            ? activeStudent.targetGpa
+            : analyzerState.plan.targetGpa,
       );
     } else {
       initialPlan = DatabaseSeeder.getResolvedPlan(activeStudent.uid);

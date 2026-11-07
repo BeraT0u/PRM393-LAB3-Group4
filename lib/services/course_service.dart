@@ -15,6 +15,26 @@ class CourseService {
   CollectionReference<Map<String, dynamic>>? get _coursesRef =>
       _firestore?.collection('courses');
 
+  /// Chuẩn hóa dữ liệu môn học từ Firestore theo danh mục mẫu nếu thiếu hoặc lệch trường category/tips
+  CourseModel _normalizeCourse(CourseModel remote) {
+    final sample = DatabaseSeeder.sampleCourses
+        .cast<CourseModel?>()
+        .firstWhere((c) => c?.code == remote.code, orElse: () => null);
+    if (sample == null) return remote;
+
+    final hasValidCategory = remote.category.contains('SE') ||
+        remote.category.contains('Cơ sở') ||
+        remote.category.contains('Toán');
+    return remote.copyWith(
+      name: remote.name.trim().isEmpty ? sample.name : remote.name,
+      category: hasValidCategory ? remote.category : sample.category,
+      assessmentBreakdown: remote.assessmentBreakdown.isEmpty
+          ? sample.assessmentBreakdown
+          : remote.assessmentBreakdown,
+      studyTips: remote.studyTips.isEmpty ? sample.studyTips : remote.studyTips,
+    );
+  }
+
   /// Lấy toàn bộ danh sách môn học từ Firestore (có fallback dữ liệu mẫu nếu mất mạng)
   Future<List<CourseModel>> getCourses() async {
     final ref = _coursesRef;
@@ -30,7 +50,7 @@ class CourseService {
       }
 
       final remoteCourses = snapshot.docs.map((doc) {
-        return CourseModel.fromMap(doc.data(), doc.id);
+        return _normalizeCourse(CourseModel.fromMap(doc.data(), doc.id));
       }).toList();
 
       // Đảm bảo có đầy đủ cả các môn cơ sở trong danh mục nếu trên Firestore chưa có
@@ -61,7 +81,7 @@ class CourseService {
       try {
         final doc = await ref.doc(courseId).get();
         if (doc.exists && doc.data() != null) {
-          return CourseModel.fromMap(doc.data()!, doc.id);
+          return _normalizeCourse(CourseModel.fromMap(doc.data()!, doc.id));
         }
       } catch (e) {
         AppLogger.warning('Lỗi getCourseById($courseId): $e');

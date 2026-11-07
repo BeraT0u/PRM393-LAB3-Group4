@@ -62,10 +62,16 @@ class CourseCatalogState {
 class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
   bool _pendingOnlyEligible = false;
   String? _pendingReplacingCode;
+  String? _lastUid;
 
   @override
   Future<CourseCatalogState> build() {
     final uid = ref.watch(currentStudentUidProvider);
+    if (_lastUid != uid) {
+      _lastUid = uid;
+      _pendingOnlyEligible = false;
+      _pendingReplacingCode = null;
+    }
     return _load(uid);
   }
 
@@ -87,6 +93,8 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
     return CourseCatalogState(
       allCourses: courses,
       passedCourseCodes: passed,
+      query: '',
+      category: CourseFilter.categoryAll,
       onlyEligible: _pendingOnlyEligible,
       replacingCourseCode: _pendingReplacingCode,
     );
@@ -94,6 +102,8 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
 
   Future<void> reload() async {
     final uid = ref.read(currentStudentUidProvider);
+    _pendingOnlyEligible = false;
+    _pendingReplacingCode = null;
     state = const AsyncLoading();
     state = await AsyncValue.guard(() => _load(uid));
   }
@@ -133,6 +143,8 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
     final current = state.value;
     if (current != null) {
       state = AsyncData(current.copyWith(
+        query: '',
+        category: CourseFilter.categoryAll,
         onlyEligible: value,
         replacingCourseCode: replacingCourseCode,
         clearReplacingCourseCode: replacingCourseCode == null,
@@ -140,7 +152,7 @@ class CourseCatalogViewModel extends AsyncNotifier<CourseCatalogState> {
     }
   }
 
-  /// Nút "Xóa bộ lọc" ở trạng thái rỗng
+  /// Nút "Xóa bộ lọc" ở trạng thái rỗng hoặc reset bộ lọc khi mở màn hình Tìm Môn
   void clearFilters() {
     _pendingOnlyEligible = false;
     _pendingReplacingCode = null;

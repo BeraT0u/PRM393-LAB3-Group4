@@ -177,6 +177,9 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
                 id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
                 semesterName: currentSemesterName,
                 selectedCourses: currentSelected,
+                targetGpa: profile.targetGpa > 0
+                    ? profile.targetGpa
+                    : state.plan.targetGpa,
                 tuitionFee: _calculateTuition(currentSelected),
               )
             : loadedPlan.copyWith(
@@ -218,6 +221,14 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     );
   }
 
+  /// Đồng bộ mục tiêu GPA mới từ SCR-08 sang kế hoạch học tập hiện tại
+  void syncTargetGpa(double targetGpa) {
+    if (targetGpa <= 0) return;
+    final updatedPlan = state.plan.copyWith(targetGpa: targetGpa);
+    _planService.saveLocalDraftPlan(updatedPlan);
+    state = state.copyWith(plan: updatedPlan);
+  }
+
   /// Tính lại học phí dựa trên tổng tín chỉ (950.000đ / tín chỉ)
   int _calculateTuition(List<CourseModel> courses) {
     final credits = courses.fold<int>(0, (sum, c) => sum + c.credits);
@@ -237,7 +248,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     final existingIndex =
         currentCourses.indexWhere((c) => c.code == incomingCourse.code);
 
+    // Tránh áp dụng và log analytics lặp lại nếu môn học đã được cập nhật y hệt ngay trước khi điều hướng
     if (existingIndex >= 0) {
+      final existing = currentCourses[existingIndex];
+      if (existing.selectedGradeTarget == incomingCourse.selectedGradeTarget &&
+          existing.plannedSelfStudyHours == incomingCourse.plannedSelfStudyHours) {
+        return;
+      }
       currentCourses[existingIndex] = incomingCourse;
     } else {
       currentCourses.add(incomingCourse);

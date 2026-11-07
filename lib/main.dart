@@ -42,8 +42,16 @@ class EduPlanApp extends StatelessWidget {
         '/catalog': (context) => const CourseCatalogScreen(),
         '/course-detail': (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
-          final code = (args is Map ? args['courseCode'] as String? : (args is String ? args : null)) ?? 'PRM393';
-          return CourseDetailScreen(courseCode: code);
+          final code = (args is Map
+                  ? args['courseCode'] as String?
+                  : (args is String ? args : null)) ??
+              'PRM393';
+          final replacingCode =
+              args is Map ? args['replacingCourseCode'] as String? : null;
+          return CourseDetailScreen(
+            courseCode: code,
+            replacingCourseCode: replacingCode,
+          );
         },
         '/plan-analyzer': (context) => const PlanAnalyzerScreen(),
         '/selected-courses': (context) => const SelectedCoursesScreen(),

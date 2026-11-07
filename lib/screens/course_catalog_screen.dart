@@ -40,27 +40,27 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
     if (!_initializedArgs) {
       _initializedArgs = true;
       final args = ModalRoute.of(context)?.settings.arguments;
+      bool onlyEligible = widget.initialOnlyEligible == true;
+      String? replacingCode = widget.initialReplacingCourseCode;
       if (args is Map) {
-        final bool onlyEligible =
-            args['onlyEligible'] == true || (widget.initialOnlyEligible == true);
-        final String? replacingCode = (args['replacingCourseCode'] as String?) ??
-            widget.initialReplacingCourseCode;
-        if (onlyEligible) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            ref.read(courseCatalogViewModelProvider.notifier).setOnlyEligible(
-                  true,
-                  replacingCourseCode: replacingCode,
-                );
-          });
-        }
-      } else if (widget.initialOnlyEligible == true) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(courseCatalogViewModelProvider.notifier).setOnlyEligible(
-                true,
-                replacingCourseCode: widget.initialReplacingCourseCode,
-              );
-        });
+        onlyEligible = args['onlyEligible'] == true || onlyEligible;
+        replacingCode =
+            (args['replacingCourseCode'] as String?) ?? replacingCode;
       }
+
+      _searchController.clear();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (onlyEligible || replacingCode != null) {
+          ref.read(courseCatalogViewModelProvider.notifier).setOnlyEligible(
+                onlyEligible,
+                replacingCourseCode: replacingCode,
+              );
+        } else {
+          // Luôn làm mới bộ lọc khi vào màn hình Tìm Môn bình thường để tránh lỗi dính filter cũ
+          ref.read(courseCatalogViewModelProvider.notifier).clearFilters();
+        }
+      });
     }
   }
 
@@ -246,6 +246,14 @@ class _CourseCatalogScreenState extends ConsumerState<CourseCatalogScreen> {
     final vm = ref.read(courseCatalogViewModelProvider.notifier);
     final state = async.value;
     final planState = ref.watch(planAnalyzerViewModelProvider);
+
+    // Đồng bộ ô tìm kiếm với state.query nếu state đã được xóa bộ lọc từ bên ngoài
+    if (state != null && _searchController.text != state.query) {
+      _searchController.value = TextEditingValue(
+        text: state.query,
+        selection: TextSelection.collapsed(offset: state.query.length),
+      );
+    }
 
     return MainScaffold(
       currentTabIndex: 2,

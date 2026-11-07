@@ -6,6 +6,9 @@ import '../services/service_providers.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../viewmodels/completed_courses_viewmodel.dart';
+import '../viewmodels/course_catalog_viewmodel.dart';
+import '../viewmodels/plan_analyzer_viewmodel.dart';
+import '../viewmodels/semester_summary_viewmodel.dart';
 
 /// UC-08: SCR-01 — Login Screen & SCR-01_Loading
 /// Đăng nhập bằng tài khoản Google thực tế (mỗi tài khoản mới khởi tạo hồ sơ 0 TC để tự xây dựng lộ trình).
@@ -78,6 +81,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       ref.read(currentStudentUidProvider.notifier).setUid(uid);
       ref.invalidate(completedCoursesViewModelProvider);
+      ref.invalidate(courseCatalogViewModelProvider);
+      ref.invalidate(planAnalyzerViewModelProvider);
+      ref.invalidate(semesterSummaryViewModelProvider);
 
       ref.read(analyticsServiceProvider).logLogin(method: 'google');
       ref.read(analyticsServiceProvider).setUserId(uid);

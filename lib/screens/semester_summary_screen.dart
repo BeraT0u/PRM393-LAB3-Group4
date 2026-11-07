@@ -641,8 +641,8 @@ class _CompleteSemesterCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.xs),
           Text(
             state.isCompleted
-                ? 'Học kỳ này đã được nghiệm thu! Toàn bộ 5 môn học đã được chuyển vào danh mục Môn Đã Học (SCR-03) và số tín chỉ đã được tích lũy vào hồ sơ.'
-                : 'Đã hoàn tất học kỳ ${state.plan.semesterName}? Nhấn nút bên dưới để tự động chuyển toàn bộ 5 môn sang danh mục "Môn Đã Học" (SCR-03) và tích lũy thêm 15 tín chỉ vào tiến độ tốt nghiệp.',
+                ? 'Học kỳ này đã được nghiệm thu! Toàn bộ ${state.courseCount} môn học đã được chuyển vào danh mục Môn Đã Học (SCR-03) và số tín chỉ đã được tích lũy vào hồ sơ.'
+                : 'Đã hoàn tất học kỳ ${state.plan.semesterName}? Nhấn nút bên dưới để tự động chuyển toàn bộ ${state.courseCount} môn sang danh mục "Môn Đã Học" (SCR-03) và tích lũy thêm ${state.totalCredits} tín chỉ vào tiến độ tốt nghiệp.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
               height: 1.4,
@@ -676,7 +676,9 @@ class _CompleteSemesterCard extends StatelessWidget {
                     : (state.isCompleted ? 'Kỳ học đã hoàn thành' : '✅ Đã Hoàn Thành Kỳ Học'),
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
-              onPressed: (state.isCompleted || state.isCompletingSemester) ? null : onComplete,
+              onPressed: (state.isCompleted || state.isCompletingSemester || state.courseCount == 0)
+                  ? null
+                  : onComplete,
             ),
           ),
         ],

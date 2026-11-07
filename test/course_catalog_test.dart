@@ -27,6 +27,10 @@ Widget _app({bool never = false}) {
     child: MaterialApp(
       theme: AppTheme.warmPaperTheme,
       home: const CourseCatalogScreen(),
+      routes: {
+        '/home': (_) => const Scaffold(body: Text('HOME_SCREEN')),
+        '/catalog': (_) => const CourseCatalogScreen(),
+      },
     ),
   );
 }
@@ -101,6 +105,30 @@ void main() {
 
       expect(find.textContaining('OSG209'), findsWidgets);
       expect(find.textContaining('PRM393'), findsNothing);
+    });
+
+    testWidgets('không bị dính filter tìm kiếm hoặc danh mục khi chuyển tab rồi quay lại Tìm Môn', (tester) async {
+      await tester.pumpWidget(_app());
+      await tester.pumpAndSettle();
+
+      // Nhập từ khóa tìm kiếm OSG209 khiến danh sách chỉ còn 1 môn Hệ điều hành
+      await tester.enterText(find.byType(TextFormField), 'OSG209');
+      await tester.pumpAndSettle();
+      expect(find.textContaining('OSG209'), findsWidgets);
+      expect(find.textContaining('PRM393'), findsNothing);
+
+      // Chuyển sang tab Trang chủ (pushReplacementNamed) làm hủy CourseCatalogScreen cũ
+      await tester.tap(find.text('Trang chủ'));
+      await tester.pumpAndSettle();
+      expect(find.text('HOME_SCREEN'), findsOneWidget);
+
+      // Mở lại màn hình Tìm Môn (/catalog)
+      final navContext = tester.element(find.text('HOME_SCREEN'));
+      Navigator.of(navContext).pushReplacementNamed('/catalog');
+      await tester.pumpAndSettle();
+
+      // Danh sách môn phải tự động xóa bộ lọc cũ và hiển thị đầy đủ tất cả các môn (bao gồm PRM393)
+      expect(find.textContaining('PRM393'), findsWidgets);
     });
   });
 }

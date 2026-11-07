@@ -19,10 +19,7 @@ class AppSearchBar extends StatelessWidget {
     this.semanticsLabel,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    final hasText = controller != null && controller!.text.isNotEmpty;
-
+  Widget _buildField(BuildContext context, bool hasText) {
     return Semantics(
       textField: true,
       label: semanticsLabel ?? hintText,
@@ -60,6 +57,19 @@ class AppSearchBar extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller == null) {
+      return _buildField(context, false);
+    }
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller!,
+      builder: (context, value, _) {
+        return _buildField(context, value.text.isNotEmpty);
+      },
     );
   }
 }

@@ -310,6 +310,10 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
           totalGraduationCredits: totalGraduationCredits,
         );
 
+    if (targetGpa != null && targetGpa > 0) {
+      ref.read(planAnalyzerViewModelProvider.notifier).syncTargetGpa(targetGpa);
+    }
+
     final current = state.value;
     if (current != null) {
       state = AsyncData(current.copyWith(profile: updatedProfile));
