@@ -11,7 +11,12 @@ import 'package:eduplan/viewmodels/course_detail_viewmodel.dart';
 /// ViewModel giả: bỏ qua Firestore, dùng dữ liệu mẫu.
 class _FakeDetailViewModel extends CourseDetailViewModel {
   final bool prerequisiteMet;
-  _FakeDetailViewModel(super.courseCode, {this.prerequisiteMet = true});
+  final bool isAlreadyPassed;
+  _FakeDetailViewModel(
+    super.courseCode, {
+    this.prerequisiteMet = true,
+    this.isAlreadyPassed = false,
+  });
 
   @override
   Future<CourseDetailState> build() {
@@ -20,6 +25,7 @@ class _FakeDetailViewModel extends CourseDetailViewModel {
       course: course,
       target: GradeTargetOption.fromCode(course.selectedGradeTarget),
       prerequisiteMet: prerequisiteMet,
+      isAlreadyPassed: isAlreadyPassed,
     ));
   }
 }
@@ -30,12 +36,18 @@ CourseModel _course(String code) =>
 Widget _app({
   String code = 'PRM393',
   bool prerequisiteMet = true,
+  bool isAlreadyPassed = false,
   void Function(RouteSettings)? onRoute,
 }) {
   return ProviderScope(
     overrides: [
-      courseDetailViewModelProvider(code)
-          .overrideWith(() => _FakeDetailViewModel(code, prerequisiteMet: prerequisiteMet)),
+      courseDetailViewModelProvider(code).overrideWith(
+        () => _FakeDetailViewModel(
+          code,
+          prerequisiteMet: prerequisiteMet,
+          isAlreadyPassed: isAlreadyPassed,
+        ),
+      ),
     ],
     child: MaterialApp(
       theme: AppTheme.warmPaperTheme,
@@ -135,6 +147,23 @@ void main() {
       expect(sent.selectedGradeTarget, 'B');
       expect(sent.plannedSelfStudyHours, 5.0);
       expect(find.text('PLAN_ANALYZER'), findsOneWidget);
+    });
+
+    testWidgets('Môn đã hoàn thành và đạt: nút Thêm vào Kế hoạch bị vô hiệu hóa', (tester) async {
+      _useTallScreen(tester);
+      RouteSettings? pushed;
+      await tester.pumpWidget(_app(isAlreadyPassed: true, onRoute: (s) => pushed = s));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Đã hoàn thành ✅'), findsOneWidget);
+      expect(find.text('Đã đạt môn (Không thể thêm)'), findsOneWidget);
+      expect(find.textContaining('Bạn đã hoàn thành và đạt môn học này'), findsOneWidget);
+
+      await tester.tap(find.text('Đã đạt môn (Không thể thêm)'));
+      await tester.pumpAndSettle();
+
+      // Không chuyển trang vì nút đã bị vô hiệu hóa
+      expect(pushed, isNull);
     });
   });
 }

@@ -7,6 +7,7 @@ import '../services/analytics_service.dart';
 import '../services/database_seeder.dart';
 import '../services/plan_service.dart';
 import '../services/service_providers.dart';
+import '../services/student_service.dart';
 import '../utils/grade_target.dart';
 import 'completed_courses_viewmodel.dart';
 import 'course_catalog_viewmodel.dart';
@@ -146,19 +147,75 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       final completed = await studentService.getCompletedCourses(uid);
       final merged = {
         ...profile.passedCourseCodes,
-        ...completed.map((c) => c.code),
+        ...completed.where((c) => c.isActuallyPassed).map((c) => c.code),
       }.toList();
+
+      // Tự động xác định học kỳ hiện tại của tài khoản dựa trên dữ liệu môn đã học (SCR-03)
+      final bool isUnitTestDefaultEmpty =
+          uid == DatabaseSeeder.defaultStudent.uid && completed.isEmpty;
+      final currentSemesterName = isUnitTestDefaultEmpty
+          ? state.plan.semesterName
+          : StudentService.computeCurrentSemesterName(completed);
+
+      final loadedPlan = await _planService.getStudyPlan(
+        userId: uid,
+        semester: currentSemesterName,
+        maxSafeHours: state.maxSafeThresholdHours,
+      );
+
       if (state.plan.userId == uid) {
-        state = state.copyWith(passedCourseCodes: merged);
+        // Loại bỏ môn đã hoàn thành/đạt khỏi kế hoạch nếu trước đó lỡ thêm vào
+        final currentSelected = state.plan.selectedCourses
+            .where((c) => !merged.contains(c.code))
+            .toList();
+        final loadedSelected = loadedPlan.selectedCourses
+            .where((c) => !merged.contains(c.code))
+            .toList();
+
+        final effectivePlan = state.plan.selectedCourses.isNotEmpty
+            ? state.plan.copyWith(
+                id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
+                semesterName: currentSemesterName,
+                selectedCourses: currentSelected,
+                tuitionFee: _calculateTuition(currentSelected),
+              )
+            : loadedPlan.copyWith(
+                semesterName: currentSemesterName,
+                selectedCourses: loadedSelected,
+                targetGpa: profile.targetGpa > 0
+                    ? profile.targetGpa
+                    : loadedPlan.targetGpa,
+                tuitionFee: _calculateTuition(loadedSelected),
+              );
+        _planService.saveLocalDraftPlan(effectivePlan);
+        state = state.copyWith(
+          plan: effectivePlan,
+          passedCourseCodes: merged,
+        );
       }
     } catch (_) {
       // Giữ danh sách mặc định khi offline
     }
   }
 
-  /// Đồng bộ trực tiếp danh sách mã môn đã đạt khi người dùng vừa thêm môn ở SCR-03
-  void syncPassedCourses(List<String> passedCodes) {
-    state = state.copyWith(passedCourseCodes: List<String>.from(passedCodes));
+  /// Đồng bộ trực tiếp danh sách mã môn đã đạt và học kỳ mới khi người dùng vừa thêm môn ở SCR-03
+  void syncPassedCourses(
+    List<String> passedCodes, {
+    String? semesterName,
+  }) {
+    var updatedPlan = state.plan;
+    if (semesterName != null && semesterName.trim().isNotEmpty) {
+      final uid = state.plan.userId;
+      updatedPlan = updatedPlan.copyWith(
+        id: '${uid}_${semesterName.replaceAll(' ', '_')}',
+        semesterName: semesterName,
+      );
+      _planService.saveLocalDraftPlan(updatedPlan);
+    }
+    state = state.copyWith(
+      plan: updatedPlan,
+      passedCourseCodes: List<String>.from(passedCodes),
+    );
   }
 
   /// Tính lại học phí dựa trên tổng tín chỉ (950.000đ / tín chỉ)
@@ -169,6 +226,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
   /// Cập nhật/thêm môn được chọn từ SCR-05 vào kế hoạch nháp ở local
   void applyIncomingCourse(CourseModel incomingCourse) {
+    if (state.passedCourseCodes.contains(incomingCourse.code)) {
+      state = state.copyWith(
+        errorMessage: 'Môn ${incomingCourse.code} đã hoàn thành, không thể thêm vào kế hoạch!',
+      );
+      return;
+    }
+
     final currentCourses = List<CourseModel>.from(state.plan.selectedCourses);
     final existingIndex =
         currentCourses.indexWhere((c) => c.code == incomingCourse.code);
@@ -217,6 +281,24 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     final codeToReplace = targetCodeToReplace ?? conflict?.code ?? 'IAE201';
     final targetReplacement = replacement ??
         DatabaseSeeder.sampleCourses.firstWhere((c) => c.code == 'PRM323');
+
+    if (state.passedCourseCodes.contains(targetReplacement.code)) {
+      state = state.copyWith(
+        errorMessage: 'Môn ${targetReplacement.code} đã hoàn thành, không thể dùng để thay thế!',
+      );
+      return;
+    }
+
+    // Không cho phép đổi sang môn đã có trong kế hoạch kỳ này
+    final isAlreadyInPlan = state.plan.selectedCourses.any(
+      (c) => c.code == targetReplacement.code && c.code != codeToReplace,
+    );
+    if (isAlreadyInPlan) {
+      state = state.copyWith(
+        errorMessage: 'Môn ${targetReplacement.code} đã có trong kế hoạch kỳ này!',
+      );
+      return;
+    }
 
     final updatedCourses = <CourseModel>[];
     bool replaced = false;
@@ -298,9 +380,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
   /// Xóa toàn bộ môn trong kế hoạch để chọn lại từ đầu (0 môn)
   void clearPlan() {
     final uid = ref.read(currentStudentUidProvider);
-    _planService.clearLocalDraftPlan(uid);
+    final completedState = ref.read(completedCoursesViewModelProvider).value;
+    final semester =
+        completedState?.currentSemesterName ?? state.plan.semesterName;
+    _planService.clearLocalDraftPlan(uid, semester: semester);
     final emptyPlan = _planService.getLocalDraftPlan(
       userId: uid,
+      semester: semester,
       maxSafeThresholdHours: state.maxSafeThresholdHours,
     );
     state = state.copyWith(

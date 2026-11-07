@@ -35,11 +35,10 @@ class ProfileScreen extends ConsumerWidget {
   ) {
     final nameCtrl = TextEditingController(text: profile.fullName);
     final studentIdCtrl = TextEditingController(text: profile.studentId);
-    final currentGpaCtrl = TextEditingController(
-      text: profile.currentGpa.toStringAsFixed(2),
-    );
+    final majorCtrl = TextEditingController(text: profile.major);
+    final cohortCtrl = TextEditingController(text: profile.cohort);
     final targetGpaCtrl = TextEditingController(
-      text: profile.targetGpa.toStringAsFixed(2),
+      text: profile.targetGpa > 0 ? profile.targetGpa.toStringAsFixed(2) : '',
     );
 
     showModalBottomSheet<void>(
@@ -80,7 +79,7 @@ class ProfileScreen extends ConsumerWidget {
                   controller: nameCtrl,
                   decoration: const InputDecoration(
                     labelText: 'Họ và tên sinh viên',
-                    hintText: 'VD: Nguyễn Văn An',
+                    hintText: 'VD: Nguyễn Trọng Hiếu',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -90,7 +89,7 @@ class ProfileScreen extends ConsumerWidget {
                   textCapitalization: TextCapitalization.characters,
                   decoration: const InputDecoration(
                     labelText: 'Mã số sinh viên (MSSV)',
-                    hintText: 'VD: SE180999',
+                    hintText: 'VD: SE180504',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -98,14 +97,45 @@ class ProfileScreen extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
+                      flex: 2,
                       child: TextField(
-                        controller: currentGpaCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                        controller: majorCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Chuyên ngành',
+                          hintText: 'VD: Kỹ thuật Phần mềm',
+                          border: OutlineInputBorder(),
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: TextField(
+                        controller: cohortCtrl,
+                        textCapitalization: TextCapitalization.characters,
+                        decoration: const InputDecoration(
+                          labelText: 'Khóa',
+                          hintText: 'VD: K18',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Row(
+                  children: [
+                    Expanded(
+                      child: InputDecorator(
                         decoration: const InputDecoration(
                           labelText: 'GPA hiện tại (hệ 4)',
+                          helperText: 'Tự động tính từ các môn đã nhập',
                           border: OutlineInputBorder(),
+                        ),
+                        child: Text(
+                          profile.currentGpa > 0
+                              ? profile.currentGpa.toStringAsFixed(2)
+                              : '0.00 (Chưa có môn)',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -118,6 +148,7 @@ class ProfileScreen extends ConsumerWidget {
                         ),
                         decoration: const InputDecoration(
                           labelText: 'GPA mục tiêu (hệ 4)',
+                          hintText: 'VD: 3.60',
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -130,9 +161,8 @@ class ProfileScreen extends ConsumerWidget {
                   onPressed: () async {
                     final fullName = nameCtrl.text.trim();
                     final studentId = studentIdCtrl.text.trim();
-                    final currentGpa =
-                        double.tryParse(currentGpaCtrl.text.trim()) ??
-                            profile.currentGpa;
+                    final major = majorCtrl.text.trim();
+                    final cohort = cohortCtrl.text.trim();
                     final targetGpa =
                         double.tryParse(targetGpaCtrl.text.trim()) ??
                             profile.targetGpa;
@@ -146,14 +176,19 @@ class ProfileScreen extends ConsumerWidget {
                         : fullName
                             .substring(0, fullName.length >= 2 ? 2 : 1)
                             .toUpperCase();
+                    final hasHttpAvatar = profile.avatarUrl != null &&
+                        profile.avatarUrl!.startsWith('http');
 
                     await ref
                         .read(completedCoursesViewModelProvider.notifier)
                         .updatePersonalInfo(
                           fullName: fullName,
                           studentId: studentId,
-                          avatarUrl: avatarInitials,
-                          currentGpa: currentGpa.clamp(0.0, 4.0),
+                          major: major,
+                          cohort: cohort,
+                          avatarUrl: hasHttpAvatar
+                              ? profile.avatarUrl
+                              : avatarInitials,
                           targetGpa: targetGpa.clamp(0.0, 4.0),
                         );
 
@@ -333,6 +368,12 @@ class ProfileScreen extends ConsumerWidget {
               Navigator.of(dlgCtx).pop();
               await ref.read(analyticsServiceProvider).logLogout();
               await ref.read(authServiceProvider).signOut();
+
+              // Xóa toàn bộ cache phiên làm việc và reset state giữa các tài khoản
+              ref.read(currentStudentUidProvider.notifier).clear();
+              ref.invalidate(completedCoursesViewModelProvider);
+              ref.invalidate(planAnalyzerViewModelProvider);
+
               if (!context.mounted) return;
               Navigator.of(context).pushNamedAndRemoveUntil(
                 '/login',
@@ -421,17 +462,34 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              profile.fullName,
+              profile.fullName.trim().isEmpty
+                  ? 'Chưa có thông tin họ tên'
+                  : profile.fullName,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 4),
-            Text(
-              '${profile.studentId.isEmpty ? "Chưa cập nhật MSSV" : profile.studentId} • K18 Kỹ thuật Phần mềm',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+            Builder(
+              builder: (_) {
+                final mssvText = profile.studentId.trim().isEmpty
+                    ? 'Chưa có thông tin MSSV'
+                    : profile.studentId.trim();
+                final majorParts = [
+                  if (profile.cohort.trim().isNotEmpty) profile.cohort.trim(),
+                  if (profile.major.trim().isNotEmpty) profile.major.trim(),
+                ];
+                final majorText = majorParts.isEmpty
+                    ? 'Chưa có thông tin khóa/ngành'
+                    : majorParts.join(' ');
+                return Text(
+                  '$mssvText • $majorText',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
             OutlinedButton.icon(
@@ -480,7 +538,9 @@ class ProfileScreen extends ConsumerWidget {
                     children: [
                       Text('GPA hiện tại:', style: theme.textTheme.bodyMedium),
                       Text(
-                        profile.currentGpa.toStringAsFixed(2),
+                        profile.currentGpa > 0
+                            ? profile.currentGpa.toStringAsFixed(2)
+                            : 'Chưa có thông tin',
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ],
@@ -494,7 +554,9 @@ class ProfileScreen extends ConsumerWidget {
                     children: [
                       Text('GPA mục tiêu:', style: theme.textTheme.bodyMedium),
                       Text(
-                        profile.targetGpa.toStringAsFixed(2),
+                        profile.targetGpa > 0
+                            ? profile.targetGpa.toStringAsFixed(2)
+                            : 'Chưa có thông tin',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: AppColors.primaryBlue,
@@ -507,7 +569,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // UC-32: Thẻ Học kỳ hiện tại (Fall 2024) + Nút "Chi tiết >" mở lại SCR-07
+            // UC-32: Thẻ Học kỳ hiện tại (động theo kỳ đã học của tài khoản) + Nút "Chi tiết >" mở lại SCR-07
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(AppSpacing.lg),
@@ -522,12 +584,27 @@ class ProfileScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '📚 Học kỳ ${planState.plan.semester}',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
+                        Builder(
+                          builder: (_) {
+                            final activeSemester = (completedAsync.value != null &&
+                                    (uid != DatabaseSeeder.defaultStudent.uid ||
+                                        completedAsync.value!.completed.isNotEmpty))
+                                ? completedAsync.value!.currentSemesterName
+                                : planState.plan.semester;
+                            final displayTitle = activeSemester
+                                        .toLowerCase()
+                                        .startsWith('học kỳ') ||
+                                    activeSemester.toLowerCase().startsWith('kỳ')
+                                ? '📚 $activeSemester'
+                                : '📚 Học kỳ $activeSemester';
+                            return Text(
+                              displayTitle,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -566,7 +643,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // UC-33: Nhóm cài đặt 3 Switch (Nhắc hạn Lab, Cảnh báo quá tải, Sync Calendar)
+            // UC-33: Cài đặt Tự động cảnh báo quá tải học tập
             Material(
               color: AppColors.surfaceCard,
               shape: RoundedRectangleBorder(
@@ -579,74 +656,26 @@ class ProfileScreen extends ConsumerWidget {
                   horizontal: AppSpacing.lg,
                   vertical: AppSpacing.sm,
                 ),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryBlue,
-                      title: const Text(
-                        'Nhắc hạn nộp Lab & Đồ án',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Thông báo tiến độ giờ tự học theo mục tiêu môn',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      value: profile.notifyLabDeadlines,
-                      onChanged: (val) =>
-                          vm.updateSettings(notifyLabDeadlines: val),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: AppColors.primaryBlue,
+                  title: const Text(
+                    'Tự động cảnh báo quá tải học tập',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
-                    const Divider(height: 1, color: AppColors.borderStructural),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryBlue,
-                      title: const Text(
-                        'Tự động cảnh báo quá tải học tập',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Cảnh báo đỏ khi vượt ngưỡng ${planState.maxSafeThresholdHours.toInt()}h/tuần',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      value: profile.autoWarnWorkload,
-                      onChanged: (val) =>
-                          vm.updateSettings(autoWarnWorkload: val),
+                  ),
+                  subtitle: Text(
+                    'Cảnh báo đỏ khi vượt ngưỡng ${planState.maxSafeThresholdHours.toInt()}h/tuần',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
                     ),
-                    const Divider(height: 1, color: AppColors.borderStructural),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      activeThumbColor: AppColors.primaryBlue,
-                      title: const Text(
-                        'Đồng bộ Google Calendar',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Tự động tạo lịch ôn tập khi lưu kế hoạch kỳ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      value: profile.syncGoogleCalendar,
-                      onChanged: (val) =>
-                          vm.updateSettings(syncGoogleCalendar: val),
-                    ),
-                  ],
+                  ),
+                  value: profile.autoWarnWorkload,
+                  onChanged: (val) =>
+                      vm.updateSettings(autoWarnWorkload: val),
                 ),
               ),
             ),

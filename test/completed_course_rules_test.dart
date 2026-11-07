@@ -103,7 +103,7 @@ void main() {
       );
     });
 
-    test('Không cho thêm trùng môn đã học', () {
+    test('Không cho thêm trùng môn đã đạt', () {
       final err = CompletedCourseRules.validateAdd(
         semesterIndex: 1,
         course: course('PRO192'),
@@ -111,18 +111,56 @@ void main() {
       );
       expect(err, contains('PRO192'));
     });
+
+    test('Môn rớt ở kỳ trước được phép khai báo học lại ở kỳ sau', () {
+      final failedAttempt = CompletedCourseModel(
+        code: 'MAS291',
+        name: 'MAS291',
+        credits: 3,
+        semesterIndex: 1,
+        grade: 3.0,
+        isPassed: false,
+      );
+      expect(
+        CompletedCourseRules.validateAdd(
+          semesterIndex: 2,
+          course: course('MAS291'),
+          completed: [done('PRO192', 1), failedAttempt],
+        ),
+        isNull,
+      );
+    });
+
+    test('Rớt môn tiên quyết ở kỳ trước thì không được thêm môn kế tiếp', () {
+      final failedPrereq = CompletedCourseModel(
+        code: 'PRO192',
+        name: 'PRO192',
+        credits: 3,
+        semesterIndex: 1,
+        grade: 3.0,
+        isPassed: false,
+      );
+      final err = CompletedCourseRules.validateAdd(
+        semesterIndex: 2,
+        course: course('PRM393', prereq: 'PRO192'),
+        completed: [failedPrereq],
+      );
+      expect(err, contains('PRO192'));
+    });
   });
 
   group('CompletedCourseRules.validateGrade', () {
-    test('null, quá thấp và quá cao đều lỗi', () {
+    test('null, âm và quá cao đều lỗi', () {
       expect(CompletedCourseRules.validateGrade(null), isNotNull);
-      expect(CompletedCourseRules.validateGrade(3.9), isNotNull);
+      expect(CompletedCourseRules.validateGrade(-1.0), isNotNull);
       expect(CompletedCourseRules.validateGrade(10.5), isNotNull);
     });
 
-    test('4.0 đến 10 hợp lệ', () {
+    test('0.0 đến 10.0 hợp lệ (bao gồm điểm rớt < 4.0)', () {
+      expect(CompletedCourseRules.validateGrade(0.0), isNull);
+      expect(CompletedCourseRules.validateGrade(3.5), isNull);
       expect(CompletedCourseRules.validateGrade(4.0), isNull);
-      expect(CompletedCourseRules.validateGrade(10), isNull);
+      expect(CompletedCourseRules.validateGrade(10.0), isNull);
     });
   });
 }

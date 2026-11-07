@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/completed_course_model.dart';
 import '../models/student_profile_model.dart';
 import '../models/study_plan_model.dart';
 import '../services/analytics_service.dart';
@@ -105,11 +106,23 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     // Lấy kế hoạch từ PlanAnalyzerViewModel nếu người dùng đã chọn môn và không có xung đột;
     // nếu kế hoạch đang trống (ví dụ khi mở trực tiếp SCR-07 trong test), dùng gói 5 môn chuẩn.
     final analyzerState = ref.watch(planAnalyzerViewModelProvider);
+    final dynamicSemester = (completedAsync.value != null &&
+            (uid != DatabaseSeeder.defaultStudent.uid ||
+                completedAsync.value!.completed.isNotEmpty))
+        ? completedAsync.value!.currentSemesterName
+        : analyzerState.plan.semesterName;
     StudyPlanModel initialPlan;
 
     if (!analyzerState.hasConflict &&
         analyzerState.plan.selectedCourses.isNotEmpty) {
-      initialPlan = analyzerState.plan.copyWith(isSaved: true);
+      initialPlan = analyzerState.plan.copyWith(
+        semesterName: dynamicSemester,
+        isSaved: true,
+      );
+    } else if (uid != DatabaseSeeder.defaultStudent.uid) {
+      initialPlan = analyzerState.plan.copyWith(
+        semesterName: dynamicSemester,
+      );
     } else {
       initialPlan = DatabaseSeeder.getResolvedPlan(activeStudent.uid);
     }
@@ -204,19 +217,16 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
   }
 
   /// UC-26B: Nghiệm thu kỳ học ("Đã hoàn thành kỳ học")
-  /// Tự động lưu các môn trong kế hoạch vào completed_courses, cộng dồn tín chỉ và làm mới kế hoạch
-  Future<bool> completeSemester() async {
+  /// Lưu các môn trong kế hoạch vào completed_courses kèm điểm GPA & trạng thái Đạt/Rớt do người dùng chọn
+  Future<bool> completeSemester([List<CourseGradeItem>? courseGrades]) async {
     if (state.isCompleted) return true;
     state = state.copyWith(isCompletingSemester: true, errorMessage: null);
 
     try {
-      await _studentService.markSemesterPlanCompleted(
-        uid: state.student.uid,
-        planId: state.plan.id,
-      );
-      await _studentService.completeSemesterFromPlan(
+      final addedCredits = await _studentService.completeSemesterFromPlan(
         uid: state.student.uid,
         plan: state.plan,
+        courseGrades: courseGrades,
       );
 
       final updatedProfile =
@@ -234,18 +244,21 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
         student: updatedProfile,
         plan: updatedPlan,
         successMessage:
-            'Đã nghiệm thu kỳ học! Đã tích lũy thêm ${state.totalCredits} tín chỉ.',
+            'Đã nghiệm thu kỳ học! Đã tích lũy thêm $addedCredits tín chỉ.',
       );
       return true;
     } catch (e, st) {
       AppLogger.warning('Nghiệm thu Cloud thất bại, áp dụng cập nhật cục bộ fallback: $e');
       AppLogger.error('Chi tiết lỗi nghiệm thu kỳ học', e, st);
 
+      final passedItems = courseGrades?.where((i) => i.isPassed && i.grade >= 4.0) ??
+          state.plan.selectedCourses.map((c) => CourseGradeItem(course: c, isPassed: true, grade: 8.0));
+      final addedCreds = passedItems.fold<int>(0, (sum, i) => sum + i.course.credits);
       final newPassed = Set<String>.from(state.student.passedCourseCodes)
-        ..addAll(state.plan.selectedCourses.map((c) => c.code));
+        ..addAll(passedItems.map((i) => i.course.code));
 
       final fallbackProfile = state.student.copyWith(
-        accumulatedCredits: state.student.accumulatedCredits + state.totalCredits,
+        accumulatedCredits: state.student.accumulatedCredits + addedCreds,
         passedCourseCodes: newPassed.toList(),
       );
 

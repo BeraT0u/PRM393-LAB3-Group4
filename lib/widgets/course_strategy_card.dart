@@ -90,12 +90,26 @@ class CourseStrategyCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '${course.name} (${course.code})',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                '${course.name} (${course.code})',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (completedScoreLabel != null) ...[
+              const SizedBox(width: AppSpacing.xs),
+              StatusBadge(
+                label: completedScoreLabel!,
+                type: StatusBadgeType.success,
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 6),
         Text(

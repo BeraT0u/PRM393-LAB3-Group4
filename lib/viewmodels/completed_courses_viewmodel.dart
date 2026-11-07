@@ -4,20 +4,32 @@ import '../models/course_model.dart';
 import '../models/student_profile_model.dart';
 import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
+import '../services/student_service.dart';
 import '../utils/app_logger.dart';
 import '../utils/completed_course_rules.dart';
+import '../utils/gpa_calculator.dart';
 import 'course_catalog_viewmodel.dart';
 import 'plan_analyzer_viewmodel.dart';
 
-/// Quản lý UID sinh viên đang đăng nhập (mặc định Persona 1, hỗ trợ chuyển đổi đa tài khoản / tài khoản mới).
+/// Quản lý UID sinh viên đang đăng nhập (ưu tiên tài khoản Google đang đăng nhập thực tế).
 class CurrentStudentUidNotifier extends Notifier<String> {
   @override
-  String build() => DatabaseSeeder.defaultStudent.uid;
+  String build() {
+    final currentUser = ref.read(authServiceProvider).currentUser;
+    if (currentUser != null && currentUser.uid.isNotEmpty) {
+      return currentUser.uid;
+    }
+    return DatabaseSeeder.defaultStudent.uid;
+  }
 
   void setUid(String uid) {
     if (state != uid) {
       state = uid;
     }
+  }
+
+  void clear() {
+    state = '';
   }
 }
 
@@ -70,6 +82,15 @@ class CompletedCoursesState {
 
   int get progressPercent => (progress * 100).round();
 
+  /// GPA tính tự động từ danh sách môn đã hoàn thành
+  double get calculatedGpa {
+    final validCourses = completed.where((c) => c.grade != null || c.gradeLetter != null).toList();
+    if (validCourses.isNotEmpty) {
+      return GpaCalculator.calculateGpa(validCourses);
+    }
+    return profile.currentGpa;
+  }
+
   /// Các môn có sẵn trong hồ sơ nhưng chưa nằm trong `completed_courses`,
   /// hiển thị ở nhóm "Chưa phân kỳ".
   List<CompletedCourseModel> get legacyCourses {
@@ -120,10 +141,12 @@ class CompletedCoursesState {
     return result;
   }
 
-  Set<String> get passedCodes =>
-      {...profile.passedCourseCodes, ...completed.map((c) => c.code)};
+  Set<String> get passedCodes => {
+        ...profile.passedCourseCodes,
+        ...completed.where((c) => c.isActuallyPassed).map((c) => c.code),
+      };
 
-  /// Môn trong catalog có thể thêm (chưa học)
+  /// Môn trong catalog có thể thêm (chưa học hoặc đã từng rớt cần học lại)
   List<CourseModel> get addableCourses =>
       catalog.where((c) => !passedCodes.contains(c.code)).toList();
 
@@ -138,6 +161,13 @@ class CompletedCoursesState {
     }
     return null;
   }
+
+  /// Học kỳ hiện tại dựa trên dữ liệu các môn đã học (VD: Đã học Kỳ 1 -> Học kỳ 2)
+  int get currentSemesterIndex =>
+      StudentService.computeCurrentSemesterIndex(completed);
+
+  String get currentSemesterName =>
+      StudentService.computeCurrentSemesterName(completed);
 }
 
 /// UC-13 / UC-13B: ViewModel của SCR-03 (Môn Đã Học) & Hồ sơ học tập sinh viên.
@@ -160,8 +190,27 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     final completedCodes = completed.map((c) => c.code).toSet();
     final legacy = profile.passedCourseCodes.where((c) => !completedCodes.contains(c)).toSet();
 
+    final validCourses = completed.where((c) => c.grade != null || c.gradeLetter != null).toList();
+    final realGpa = validCourses.isNotEmpty
+        ? GpaCalculator.calculateGpa(validCourses)
+        : profile.currentGpa;
+    final uniquePassed = <String, CompletedCourseModel>{};
+    for (final c in completed) {
+      if (c.isActuallyPassed) {
+        uniquePassed[c.code] = c;
+      }
+    }
+    final realCredits = completed.isNotEmpty
+        ? uniquePassed.values.fold<int>(0, (int total, c) => total + c.credits)
+        : profile.accumulatedCredits;
+
+    final syncedProfile = profile.copyWith(
+      currentGpa: realGpa,
+      accumulatedCredits: realCredits,
+    );
+
     var next = CompletedCoursesState(
-      profile: profile,
+      profile: syncedProfile,
       completed: completed,
       legacyPassedCodes: legacy,
       catalog: catalog,
@@ -220,9 +269,10 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
       final updatedState = await _load(uid: uid, filter: filter);
       state = AsyncData(updatedState);
 
-      // Đồng bộ danh sách môn đã học sang CourseCatalog và PlanAnalyzer
+      // Đồng bộ danh sách môn đã học và học kỳ mới sang CourseCatalog & PlanAnalyzer
       ref.read(planAnalyzerViewModelProvider.notifier).syncPassedCourses(
             updatedState.passedCodes.toList(),
+            semesterName: updatedState.currentSemesterName,
           );
       ref.invalidate(courseCatalogViewModelProvider);
       return null;
@@ -238,6 +288,8 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
   Future<void> updatePersonalInfo({
     required String fullName,
     required String studentId,
+    String? major,
+    String? cohort,
     String? email,
     String? avatarUrl,
     double? currentGpa,
@@ -249,6 +301,8 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
           uid: uid,
           fullName: fullName,
           studentId: studentId,
+          major: major,
+          cohort: cohort,
           email: email,
           avatarUrl: avatarUrl,
           currentGpa: currentGpa,

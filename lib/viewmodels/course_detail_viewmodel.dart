@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/course_model.dart';
+import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
 import '../utils/grade_target.dart';
 import 'completed_courses_viewmodel.dart' show currentStudentUidProvider;
@@ -13,19 +14,30 @@ class CourseDetailState {
   /// `true` nếu không có tiên quyết hoặc sinh viên đã hoàn thành môn tiên quyết.
   final bool prerequisiteMet;
 
+  /// `true` nếu sinh viên ĐÃ HỌC VÀ ĐẠT môn học này trong quá khứ.
+  /// Môn đã đạt thì KHÔNG thể nhấn nút thêm vào kế hoạch học mới.
+  /// Chỉ những môn CHƯA HỌC hoặc ĐÃ RỚT mới được phép thêm vào kế hoạch.
+  final bool isAlreadyPassed;
+
   const CourseDetailState({
     required this.course,
     required this.target,
     this.isFavorite = false,
     this.prerequisiteMet = true,
+    this.isAlreadyPassed = false,
   });
 
-  CourseDetailState copyWith({GradeTargetOption? target, bool? isFavorite}) {
+  CourseDetailState copyWith({
+    GradeTargetOption? target,
+    bool? isFavorite,
+    bool? isAlreadyPassed,
+  }) {
     return CourseDetailState(
       course: course,
       target: target ?? this.target,
       isFavorite: isFavorite ?? this.isFavorite,
       prerequisiteMet: prerequisiteMet,
+      isAlreadyPassed: isAlreadyPassed ?? this.isAlreadyPassed,
     );
   }
 
@@ -59,17 +71,31 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
     }
 
     var prerequisiteMet = true;
-    final prereq = course.prerequisiteCode?.trim();
-    if (prereq != null && prereq.isNotEmpty) {
-      final uid = ref.read(currentStudentUidProvider);
+    var isAlreadyPassed = false;
+    final uid = ref.watch(currentStudentUidProvider);
+
+    try {
       final studentService = ref.read(studentServiceProvider);
       final profile = await studentService.getStudentProfile(uid);
       final completed = await studentService.getCompletedCourses(uid);
       final passed = {
         ...profile.passedCourseCodes,
-        ...completed.map((c) => c.code),
+        ...completed.where((c) => c.isActuallyPassed).map((c) => c.code),
       };
-      prerequisiteMet = passed.contains(prereq);
+
+      isAlreadyPassed = passed.contains(courseCode);
+
+      final prereq = course.prerequisiteCode?.trim();
+      if (prereq != null && prereq.isNotEmpty) {
+        prerequisiteMet = passed.contains(prereq);
+      }
+    } catch (_) {
+      final fallbackStudent = DatabaseSeeder.getStudentByUid(uid);
+      isAlreadyPassed = fallbackStudent.passedCourseCodes.contains(courseCode);
+      final prereq = course.prerequisiteCode?.trim();
+      if (prereq != null && prereq.isNotEmpty) {
+        prerequisiteMet = fallbackStudent.passedCourseCodes.contains(prereq);
+      }
     }
 
     ref.read(analyticsServiceProvider).logViewCourseDetail(
@@ -82,6 +108,7 @@ class CourseDetailViewModel extends AsyncNotifier<CourseDetailState> {
       course: course,
       target: GradeTargetOption.fromCode(course.selectedGradeTarget),
       prerequisiteMet: prerequisiteMet,
+      isAlreadyPassed: isAlreadyPassed,
     );
   }
 
