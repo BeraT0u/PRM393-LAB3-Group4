@@ -7,16 +7,17 @@ import 'database_seeder.dart';
 
 class CourseService {
   final FirebaseFirestore? _firestore;
-  final Set<String> _favoriteCourseCodes = {};
+  Set<String>? _favoriteCourseCodes;
+  Set<String> get _favorites => _favoriteCourseCodes ??= <String>{};
 
-  bool isFavorite(String courseCode) => _favoriteCourseCodes.contains(courseCode);
+  bool isFavorite(String courseCode) => _favorites.contains(courseCode);
 
   bool toggleFavorite(String courseCode) {
-    if (_favoriteCourseCodes.contains(courseCode)) {
-      _favoriteCourseCodes.remove(courseCode);
+    if (_favorites.contains(courseCode)) {
+      _favorites.remove(courseCode);
       return false;
     } else {
-      _favoriteCourseCodes.add(courseCode);
+      _favorites.add(courseCode);
       return true;
     }
   }

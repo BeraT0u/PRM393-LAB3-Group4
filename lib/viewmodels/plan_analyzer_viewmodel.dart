@@ -16,7 +16,8 @@ class PlanAnalyzerState {
   final StudyPlanModel plan;
   final List<String> passedCourseCodes;
   final double maxSafeThresholdHours;
-  final bool autoWarnWorkload;
+  final bool? _autoWarnWorkload;
+  bool get autoWarnWorkload => _autoWarnWorkload ?? true;
   final bool isLoading;
   final bool isSaving;
   final String? errorMessage;
@@ -26,12 +27,12 @@ class PlanAnalyzerState {
     required this.plan,
     this.passedCourseCodes = const ['PRO192', 'MAD101', 'CSD201', 'DBI202', 'MAS291'],
     this.maxSafeThresholdHours = 25.0,
-    this.autoWarnWorkload = true,
+    bool? autoWarnWorkload = true,
     this.isLoading = false,
     this.isSaving = false,
     this.errorMessage,
     this.hasReplacedConflict = false,
-  });
+  }) : _autoWarnWorkload = autoWarnWorkload ?? true;
 
   bool get isOverloaded =>
       autoWarnWorkload &&
