@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
+import 'firebase_options.dart';
 import '../services/database_seeder.dart';
 import '../utils/app_logger.dart';
 
@@ -9,8 +10,10 @@ class FirebaseService {
 
   static Future<void> initialize() async {
     try {
-      // Khởi tạo Firebase SDK
-      await Firebase.initializeApp();
+      // Khởi tạo Firebase SDK (hỗ trợ cả Android và Web)
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
       isFirebaseInitialized = true;
       AppLogger.info('Firebase đã được khởi tạo thành công.');
 
