@@ -10,6 +10,11 @@ const PROJECT_ID = 'prm393-final-test';
 
 describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
   let testEnv;
+  let systemDb;
+  let userDb;
+  let staffDb;
+  let adminDb;
+  let otherUserDb;
 
   before(async () => {
     const rulesPath = path.resolve(__dirname, '../firestore.rules');
@@ -19,10 +24,17 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
       projectId: PROJECT_ID,
       firestore: {
         rules: rules,
-        host: '127.0.0.1',
-        port: 8080,
       },
     });
+
+    // Create system DB context once to bypass rules for seeding
+    systemDb = testEnv.createContext('owner').firestore();
+
+    // Create test user contexts once to prevent re-initialization crashes
+    userDb = testEnv.authenticatedContext('user_123').firestore();
+    staffDb = testEnv.authenticatedContext('staff_1').firestore();
+    adminDb = testEnv.authenticatedContext('admin_1').firestore();
+    otherUserDb = testEnv.authenticatedContext('user_456').firestore();
   });
 
   after(async () => {
@@ -37,7 +49,6 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-01: users - user creates own profile on first sign-in with role = 'user' -> Allowed
   it('R-01: user can create personal profile with role = "user"', async () => {
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertSucceeds(
       userDb.collection('users').doc('user_123').set({
         uid: 'user_123',
@@ -51,16 +62,13 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-02: users - user self-updates own role to 'admin' -> Denied
   it('R-02: user cannot escalate own role to "admin"', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('user_123').set({
-        uid: 'user_123',
-        email: 'user123@fpt.edu.vn',
-        role: 'user',
-        displayName: 'Student One',
-      });
+    await systemDb.collection('users').doc('user_123').set({
+      uid: 'user_123',
+      email: 'user123@fpt.edu.vn',
+      role: 'user',
+      displayName: 'Student One',
     });
 
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertFails(
       userDb.collection('users').doc('user_123').update({
         role: 'admin',
@@ -70,20 +78,17 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-03: users - admin updates role of another user to 'staff' -> Allowed
   it('R-03: admin can update role of another user to "staff"', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('admin_1').set({
-        uid: 'admin_1',
-        email: 'admin@fpt.edu.vn',
-        role: 'admin',
-      });
-      await context.firestore().collection('users').doc('user_123').set({
-        uid: 'user_123',
-        email: 'user123@fpt.edu.vn',
-        role: 'user',
-      });
+    await systemDb.collection('users').doc('admin_1').set({
+      uid: 'admin_1',
+      email: 'admin@fpt.edu.vn',
+      role: 'admin',
+    });
+    await systemDb.collection('users').doc('user_123').set({
+      uid: 'user_123',
+      email: 'user123@fpt.edu.vn',
+      role: 'user',
     });
 
-    const adminDb = testEnv.authenticatedContext('admin_1').firestore();
     await assertSucceeds(
       adminDb.collection('users').doc('user_123').update({
         role: 'staff',
@@ -93,49 +98,43 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-04: courses - user reads course with status == 'published' -> Allowed
   it('R-04: user can read courses with status == "published"', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('user_123').set({
-        uid: 'user_123',
-        role: 'user',
-      });
-      await context.firestore().collection('courses').doc('PRM392').set({
-        id: 'PRM392',
-        code: 'PRM392',
-        name: 'Mobile Programming',
-        credits: 3,
-        status: 'published',
-      });
-      await context.firestore().collection('courses').doc('DRAFT101').set({
-        id: 'DRAFT101',
-        code: 'DRAFT101',
-        name: 'Draft Course',
-        credits: 2,
-        status: 'draft',
-      });
+    await systemDb.collection('users').doc('user_123').set({
+      uid: 'user_123',
+      role: 'user',
+    });
+    await systemDb.collection('courses').doc('PRM392').set({
+      id: 'PRM392',
+      code: 'PRM392',
+      name: 'Mobile Programming',
+      credits: 3,
+      status: 'published',
+    });
+    await systemDb.collection('courses').doc('DRAFT101').set({
+      id: 'DRAFT101',
+      code: 'DRAFT101',
+      name: 'Draft Course',
+      credits: 2,
+      status: 'draft',
     });
 
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertSucceeds(userDb.collection('courses').doc('PRM392').get());
     await assertFails(userDb.collection('courses').doc('DRAFT101').get());
   });
 
   // R-05: courses - user creates or updates course -> Denied
   it('R-05: regular user cannot create or update courses', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('user_123').set({
-        uid: 'user_123',
-        role: 'user',
-      });
-      await context.firestore().collection('courses').doc('PRM392').set({
-        id: 'PRM392',
-        code: 'PRM392',
-        name: 'Mobile Programming',
-        credits: 3,
-        status: 'published',
-      });
+    await systemDb.collection('users').doc('user_123').set({
+      uid: 'user_123',
+      role: 'user',
+    });
+    await systemDb.collection('courses').doc('PRM392').set({
+      id: 'PRM392',
+      code: 'PRM392',
+      name: 'Mobile Programming',
+      credits: 3,
+      status: 'published',
     });
 
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertFails(
       userDb.collection('courses').doc('SWP391').set({
         code: 'SWP391',
@@ -153,14 +152,11 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-06: courses - staff or admin creates/updates course with name.size() <= 120 -> Allowed
   it('R-06: staff or admin can create / update course with name.size() <= 120', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('staff_1').set({
-        uid: 'staff_1',
-        role: 'staff',
-      });
+    await systemDb.collection('users').doc('staff_1').set({
+      uid: 'staff_1',
+      role: 'staff',
     });
 
-    const staffDb = testEnv.authenticatedContext('staff_1').firestore();
     await assertSucceeds(
       staffDb.collection('courses').doc('PRM392').set({
         code: 'PRM392',
@@ -173,45 +169,38 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-07: courses - staff deletes a course -> Denied
   it('R-07: staff cannot hard delete a course', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('staff_1').set({
-        uid: 'staff_1',
-        role: 'staff',
-      });
-      await context.firestore().collection('courses').doc('PRM392').set({
-        code: 'PRM392',
-        name: 'Mobile Programming',
-        credits: 3,
-        status: 'published',
-      });
+    await systemDb.collection('users').doc('staff_1').set({
+      uid: 'staff_1',
+      role: 'staff',
+    });
+    await systemDb.collection('courses').doc('PRM392').set({
+      code: 'PRM392',
+      name: 'Mobile Programming',
+      credits: 3,
+      status: 'published',
     });
 
-    const staffDb = testEnv.authenticatedContext('staff_1').firestore();
     await assertFails(staffDb.collection('courses').doc('PRM392').delete());
   });
 
   // R-07B: courses - admin deletes a course -> Allowed
   it('R-07B: admin can hard delete a course', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('admin_1').set({
-        uid: 'admin_1',
-        role: 'admin',
-      });
-      await context.firestore().collection('courses').doc('PRM392').set({
-        code: 'PRM392',
-        name: 'Mobile Programming',
-        credits: 3,
-        status: 'published',
-      });
+    await systemDb.collection('users').doc('admin_1').set({
+      uid: 'admin_1',
+      role: 'admin',
+    });
+    await systemDb.collection('courses').doc('PRM392').set({
+      code: 'PRM392',
+      name: 'Mobile Programming',
+      credits: 3,
+      status: 'published',
     });
 
-    const adminDb = testEnv.authenticatedContext('admin_1').firestore();
     await assertSucceeds(adminDb.collection('courses').doc('PRM392').delete());
   });
 
   // R-08: study_plans - user creates own plan with status == 'pending' -> Allowed
   it('R-08: user can create own study plan with status == "pending"', async () => {
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertSucceeds(
       userDb.collection('study_plans').doc('plan_1').set({
         userId: 'user_123',
@@ -224,7 +213,6 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-09: study_plans - user creates plan with status == 'approved' (self-approve) -> Denied
   it('R-09: user cannot create own plan with status == "approved"', async () => {
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertFails(
       userDb.collection('study_plans').doc('plan_1').set({
         userId: 'user_123',
@@ -237,19 +225,16 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-10: study_plans - staff updates plan from 'pending' -> 'approved' with reviewReason -> Allowed
   it('R-10: staff can update plan from "pending" to "approved" with reviewReason', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('staff_1').set({
-        uid: 'staff_1',
-        role: 'staff',
-      });
-      await context.firestore().collection('study_plans').doc('plan_1').set({
-        userId: 'user_123',
-        status: 'pending',
-        semesterName: 'Fall 2026',
-      });
+    await systemDb.collection('users').doc('staff_1').set({
+      uid: 'staff_1',
+      role: 'staff',
+    });
+    await systemDb.collection('study_plans').doc('plan_1').set({
+      userId: 'user_123',
+      status: 'pending',
+      semesterName: 'Fall 2026',
     });
 
-    const staffDb = testEnv.authenticatedContext('staff_1').firestore();
     await assertSucceeds(
       staffDb.collection('study_plans').doc('plan_1').update({
         status: 'approved',
@@ -261,14 +246,11 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-11: announcements - user creates new announcement -> Denied
   it('R-11: regular user cannot create announcement', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('user_123').set({
-        uid: 'user_123',
-        role: 'user',
-      });
+    await systemDb.collection('users').doc('user_123').set({
+      uid: 'user_123',
+      role: 'user',
     });
 
-    const userDb = testEnv.authenticatedContext('user_123').firestore();
     await assertFails(
       userDb.collection('announcements').doc('ann_1').set({
         title: 'Học bổng kỳ tới',
@@ -279,14 +261,11 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // R-12: announcements - staff creates new announcement with status == 'published' -> Allowed
   it('R-12: staff can create announcement with status == "published"', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('staff_1').set({
-        uid: 'staff_1',
-        role: 'staff',
-      });
+    await systemDb.collection('users').doc('staff_1').set({
+      uid: 'staff_1',
+      role: 'staff',
     });
 
-    const staffDb = testEnv.authenticatedContext('staff_1').firestore();
     await assertSucceeds(
       staffDb.collection('announcements').doc('ann_1').set({
         title: 'Thông báo mở đăng ký môn chuyên ngành Fall 2026',
@@ -298,22 +277,19 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
   // Students collection verification
   it('Students: student can read & write own profile, staff/admin can read, other user denied', async () => {
-    await testEnv.withSecurityRulesDisabled(async (context) => {
-      await context.firestore().collection('users').doc('staff_1').set({
-        uid: 'staff_1',
-        role: 'staff',
-      });
-      await context.firestore().collection('users').doc('user_456').set({
-        uid: 'user_456',
-        role: 'user',
-      });
+    await systemDb.collection('users').doc('staff_1').set({
+      uid: 'staff_1',
+      role: 'staff',
+    });
+    await systemDb.collection('users').doc('user_456').set({
+      uid: 'user_456',
+      role: 'user',
     });
 
-    const studentDb = testEnv.authenticatedContext('student_123').firestore();
     // Student creates own profile
     await assertSucceeds(
-      studentDb.collection('students').doc('student_123').set({
-        uid: 'student_123',
+      userDb.collection('students').doc('user_123').set({
+        uid: 'user_123',
         fullName: 'Nguyen Van A',
         studentId: 'SE123456',
         currentGpa: 3.5,
@@ -322,29 +298,27 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
 
     // Student creates completed_courses
     await assertSucceeds(
-      studentDb.collection('students').doc('student_123').collection('completed_courses').doc('PRM392').set({
+      userDb.collection('students').doc('user_123').collection('completed_courses').doc('PRM392').set({
         code: 'PRM392',
         grade: 8.5,
         isPassed: true,
       })
     );
 
-    // Staff can read student profile
-    const staffDb = testEnv.authenticatedContext('staff_1').firestore();
+    // Staff can read student profile and subcollection
     await assertSucceeds(
-      staffDb.collection('students').doc('student_123').get()
+      staffDb.collection('students').doc('user_123').get()
     );
     await assertSucceeds(
-      staffDb.collection('students').doc('student_123').collection('completed_courses').doc('PRM392').get()
+      staffDb.collection('students').doc('user_123').collection('completed_courses').doc('PRM392').get()
     );
 
     // Another student cannot read
-    const otherDb = testEnv.authenticatedContext('user_456').firestore();
     await assertFails(
-      otherDb.collection('students').doc('student_123').get()
+      otherUserDb.collection('students').doc('user_123').get()
     );
     await assertFails(
-      otherDb.collection('students').doc('student_123').collection('completed_courses').doc('PRM392').get()
+      otherUserDb.collection('students').doc('user_123').collection('completed_courses').doc('PRM392').get()
     );
   });
 });

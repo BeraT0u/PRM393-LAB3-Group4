@@ -109,14 +109,8 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    function userDocExists() {
-      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
     function getUserRole() {
-      return userDocExists()
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
-        : null;
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
     }
 
     function isStaffOrAdmin() {
