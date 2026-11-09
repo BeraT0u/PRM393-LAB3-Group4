@@ -104,16 +104,14 @@ void main() {
       // Hiển thị đề xuất thay môn IAE201 -> PRM323
       expect(find.text('IAE201 (Nặng)'), findsOneWidget);
       expect(find.text('PRM323 (Cân bằng)'), findsOneWidget);
-      expect(find.text('Áp Dụng Gợi Ý Này'), findsOneWidget);
+      expect(find.text('Đồng ý'), findsOneWidget);
 
-      // Bấm nút Áp Dụng Gợi Ý Này
-      await tester.tap(find.text('Áp Dụng Gợi Ý Này'));
+      // Bấm nút Đồng ý để đóng gợi ý
+      await tester.tap(find.text('Đồng ý'));
       await tester.pumpAndSettle();
 
-      // BottomSheet đóng lại, plan được cập nhật: môn IAE201 đã được đổi thành PRM323
+      // BottomSheet đóng lại
       expect(find.byType(AiAdvisorModalSheet), findsNothing);
-      expect(find.textContaining('IAE201'), findsNothing);
-      expect(find.textContaining('PRM323'), findsWidgets);
     });
 
     testWidgets('AiAdvisorModalSheet hiển thị đầy đủ chiến lược học tập và mẹo từ AI',
@@ -182,14 +180,55 @@ void main() {
       expect(find.text('Đề xuất: Giảm thời gian tự học môn học'), findsOneWidget);
       expect(find.text('PRM393'), findsOneWidget);
       expect(find.text('6h/tuần'), findsWidgets);
-      expect(find.text('Áp Dụng Gợi Ý Này'), findsOneWidget);
+      expect(find.text('Đồng ý'), findsOneWidget);
 
-      // Bấm nút áp dụng giảm giờ
-      await tester.tap(find.text('Áp Dụng Gợi Ý Này'));
+      // Bấm nút Đồng ý để đóng gợi ý
+      await tester.tap(find.text('Đồng ý'));
       await tester.pumpAndSettle();
 
       // Modal sheet đóng lại
       expect(find.byType(AiAdvisorModalSheet), findsNothing);
+    });
+
+    testWidgets('PlanAnalyzerViewModel tự động chuẩn hóa giờ tự học về mốc chuẩn của mục tiêu điểm',
+        (tester) async {
+      // Giả lập dữ liệu lưu local bị sai lệch giờ (IAE201 Điểm A nhưng bị gán 8.0h thay vì 12.0h)
+      final corruptPlan = DatabaseSeeder.getInitialConflictPlan(
+        DatabaseSeeder.defaultStudent.uid,
+      );
+      final corruptedCourses = corruptPlan.selectedCourses.map((c) {
+        if (c.code == 'IAE201') {
+          return c.copyWith(selectedGradeTarget: 'A', plannedSelfStudyHours: 8.0);
+        }
+        return c;
+      }).toList();
+
+      planService.saveLocalDraftPlan(
+        corruptPlan.copyWith(selectedCourses: corruptedCourses),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            planServiceProvider.overrideWithValue(planService),
+            aiAdvisorServiceProvider.overrideWithValue(mockAiService),
+          ],
+          child: Consumer(
+            builder: (context, ref, _) {
+              final state = ref.watch(planAnalyzerViewModelProvider);
+              final iae = state.plan.selectedCourses.firstWhere((c) => c.code == 'IAE201');
+              return Directionality(
+                textDirection: TextDirection.ltr,
+                child: Text('IAE201_HOURS:${iae.plannedSelfStudyHours}'),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Phải tự động được chuẩn hóa về 12.0h theo đúng chuẩn Điểm A của IAE201
+      expect(find.text('IAE201_HOURS:12.0'), findsOneWidget);
     });
   });
 }

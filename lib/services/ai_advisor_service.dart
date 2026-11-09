@@ -6,6 +6,7 @@ import '../config/ai_api_keys.dart';
 import '../models/ai_plan_advice_model.dart';
 import '../models/course_model.dart';
 import '../utils/app_logger.dart';
+import '../utils/grade_target.dart';
 import '../viewmodels/plan_analyzer_viewmodel.dart';
 
 class AiAdvisorService {
@@ -265,16 +266,30 @@ class AiAdvisorService {
 
       for (final c in state.plan.selectedCourses) {
         if (advice.adjustedHours.containsKey(c.code)) {
-          final newH = advice.adjustedHours[c.code]!;
-          final oldH = c.plannedSelfStudyHours;
-          final saved = (oldH - newH);
+          final currentTarget = GradeTargetOption.fromCode(c.selectedGradeTarget);
+          final oldH = currentTarget.hoursFor(c);
+          final bHours = GradeTargetOption.gradeB.hoursFor(c);
+          final passHours = GradeTargetOption.pass.hoursFor(c);
+          final returnedNew = advice.adjustedHours[c.code]!;
+
+          GradeTargetOption suggestedTarget = GradeTargetOption.gradeB;
+          double validNewH = bHours;
+          if ((returnedNew - passHours).abs() < (returnedNew - bHours).abs()) {
+            suggestedTarget = GradeTargetOption.pass;
+            validNewH = passHours;
+          }
+
+          final saved = oldH - validNewH;
           reductions.add({
             'code': c.code,
+            'name': c.name,
+            'currentGrade': currentTarget.title,
+            'suggestedGrade': suggestedTarget.title,
             'oldHours': oldH,
-            'newHours': newH,
-            'saved': saved > 0 ? ((saved * 2).round() / 2.0) : 0.0,
+            'newHours': validNewH,
+            'saved': saved > 0 ? saved : 0.0,
           });
-          newSum += newH;
+          newSum += validNewH;
         } else {
           newSum += c.plannedSelfStudyHours;
         }
@@ -304,14 +319,19 @@ class AiAdvisorService {
     List<CourseModel> allCourses,
     String systemPrompt,
   ) {
-    final selectedCoursesData = state.plan.selectedCourses.map((c) => {
-          'code': c.code,
-          'name': c.name,
-          'credits': c.credits,
-          'plannedSelfStudyHours': c.plannedSelfStudyHours,
-          'selectedGradeTarget': c.selectedGradeTarget,
-          'prerequisiteCode': c.prerequisiteCode,
-        }).toList();
+    final selectedCoursesData = state.plan.selectedCourses.map((c) {
+      return {
+        'code': c.code,
+        'name': c.name,
+        'credits': c.credits,
+        'currentGradeTarget': c.selectedGradeTarget,
+        'currentHours': c.plannedSelfStudyHours,
+        'hoursAtGradeA': GradeTargetOption.gradeA.hoursFor(c),
+        'hoursAtGradeB': GradeTargetOption.gradeB.hoursFor(c),
+        'hoursAtPass': GradeTargetOption.pass.hoursFor(c),
+        'prerequisiteCode': c.prerequisiteCode,
+      };
+    }).toList();
 
     // Các môn trong catalog mà sinh viên đủ điều kiện tiên quyết và chưa chọn
     final eligibleCatalog = allCourses.where((c) {
@@ -331,7 +351,7 @@ $systemPrompt
 
 Dưới đây là thông số học tập ẩn danh của sinh viên:
 - Các môn đã hoàn thành (tiên quyết đã đạt): ${jsonEncode(state.passedCourseCodes)}
-- Danh sách môn sinh viên đang chọn cho học kỳ:
+- Danh sách môn sinh viên đang chọn cho học kỳ (kèm các mốc giờ chuẩn tương ứng với mục tiêu điểm):
 ${jsonEncode(selectedCoursesData)}
 - Tổng số giờ tự học hiện tại: ${state.totalHours} giờ/tuần
 - Ngưỡng an toàn khuyến cáo: ${state.maxSafeThresholdHours} giờ/tuần
@@ -339,47 +359,58 @@ ${jsonEncode(selectedCoursesData)}
 ${jsonEncode(eligibleCatalog)}
 
 QUY TẮC BẮT BUỘC KHI PHÂN TÍCH (TUÂN THỦ THEO ĐÚNG THỨ TỰ ƯU TIÊN):
-1. ƯU TIÊN SỐ 1 (KHI QUÁ TẢI TỪ ${state.maxSafeThresholdHours}h ĐẾN 31h/TUẦN VÀ KHÔNG BỊ LỖI TIÊN QUYẾT):
+1. QUY ĐỊNH VỀ MỐC GIỜ TỰ HỌC:
+   Mỗi môn học có đúng 3 mốc giờ tự học ứng với 3 mức mục tiêu điểm (A / B / Qua môn):
+   - Mức A: hoursAtGradeA
+   - Mức B: hoursAtGradeB
+   - Mức Qua môn: hoursAtPass
+   BẮT BUỘC PHẢI DÙNG CHÍNH XÁC SỐ GIỜ CỦA CÁC MỐC NÀY, TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ NGHĨ RA CON SỐ TÙY TIỆN!
+
+2. ƯU TIÊN SỐ 1 (KHI QUÁ TẢI TỪ ${state.maxSafeThresholdHours}h ĐẾN 31h/TUẦN VÀ KHÔNG BỊ LỖI TIÊN QUYẾT):
    - BẮT BUỘC chọn "recommendedAction": "reduce_hours".
-   - Bạn PHẢI đề xuất GIẢM GIỜ TỰ HỌC của các môn học đang chiếm nhiều giờ nhất (>= 7h/tuần).
-   - "adjustedHours": { "MÃ_MÔN_1": GIỜ_MỚI, "MÃ_MÔN_2": GIỜ_MỚI }
+   - Bạn PHẢI đề xuất hạ mục tiêu điểm của môn chiếm nhiều giờ nhất từ Điểm A xuống Điểm B (hoursAtGradeB) hoặc Qua môn (hoursAtPass).
+   - "adjustedHours": { "MÃ_MÔN": GIỜ_CHUẨN_MỨC_MỚI }
    - "hoursReductions": [
-       { "code": "MÃ_MÔN_1", "oldHours": GIỜ_CŨ, "newHours": GIỜ_MỚI, "saved": SỐ_GIỜ_GIẢM }
+       {
+         "code": "MÃ_MÔN",
+         "currentGrade": "Điểm A",
+         "suggestedGrade": "Điểm B",
+         "oldHours": GIỜ_CŨ,
+         "newHours": GIỜ_MỚI,
+         "saved": SỐ_GIỜ_GIẢM
+       }
      ]
    - BẮT BUỘC: Tổng số giờ sau khi giảm ("estimatedHoursAfter") PHẢI NHỎ HƠN HOẶC BẰNG 24.5 giờ/tuần!
-   - Trong "reason" và "analysis": Nêu ĐÍCH DANH mã môn học và mức giảm cụ thể (ví dụ: "Giảm giờ tự học môn A từ 8h xuống 6h (-2h), môn B từ 7h xuống 5.5h (-1.5h) để đưa tổng giờ về 23.5h/tuần").
-   - KHÔNG ĐƯỢC khuyên "giữ nguyên" hay "keep" khi tổng giờ > ${state.maxSafeThresholdHours}h.
+   - Trong "reason" và "analysis": Nêu rõ tên môn, mốc điểm cũ sang mốc điểm mới và số giờ giảm cụ thể.
+   - Bạn chỉ đưa ra gợi ý/lời khuyên để người dùng tự điều chỉnh trên ứng dụng, không tự ý can thiệp.
 
-2. ƯU TIÊN SỐ 2 (KHI CỰC KỲ QUÁ TẢI > 31h/TUẦN HOẶC CÓ MÔN VI PHẠM ĐIỀU KIỆN TIÊN QUYẾT):
-   - Nếu có môn vi phạm tiên quyết hoặc số giờ quá tải cực lớn không thể cân bằng bằng giảm giờ:
-     Chọn "recommendedAction": "replace" (hoán đổi sang môn nhẹ hơn trong danh sách môn khả dụng) HOẶC "drop" (bớt 1 môn sang kỳ sau).
-   - Chỉ rõ "targetCourseCode" (môn cần thay/bỏ) và "suggestedCourseCode" (môn thay thế).
-   - "estimatedHoursAfter" cũng BẮT BUỘC PHẢI <= 25.0 giờ/tuần.
-
-3. TRƯỜNG HỢP KẾ HOẠCH ĐÃ CÂN BẰNG (<= ${state.maxSafeThresholdHours}h/tuần và hợp lệ tiên quyết):
-   - "recommendedAction": "keep", "estimatedHoursAfter": ${state.totalHours}.
+3. ƯU TIÊN SỐ 2 (KHI CỰC KỲ QUÁ TẢI > 31h/TUẦN HOẶC CÓ MÔN VI PHẠM ĐIỀU KIỆN TIÊN QUYẾT):
+   - Chọn "recommendedAction": "replace" (gợi ý đổi sang môn nhẹ hơn) HOẶC "drop" (gợi ý bớt 1 môn sang kỳ sau).
+   - Chỉ rõ "targetCourseCode" và "suggestedCourseCode" (nếu là replace).
 
 Hãy phân tích và trả về DUY NHẤT một chuỗi JSON hợp lệ theo cấu trúc sau (không kèm văn bản thừa ngoài JSON):
 {
   "riskLevel": "high" hoặc "safe",
-  "analysis": "Lời nhận xét chi tiết về lộ trình kỳ học và cảnh báo quá tải",
+  "analysis": "Lời nhận xét chi tiết về lộ trình kỳ học và hướng dẫn người dùng",
   "recommendedAction": "reduce_hours" hoặc "replace" hoặc "drop" hoặc "keep",
-  "targetCourseCode": "Mã môn cần thay đổi hoặc bớt (nếu action là replace/drop, ngược lại null)",
+  "targetCourseCode": "Mã môn cần đổi hoặc bớt (nếu action là replace/drop, ngược lại null)",
   "suggestedCourseCode": "Mã môn thay thế (nếu action là replace, ngược lại null)",
   "suggestedGradeTarget": "Mục tiêu điểm gợi ý (ví dụ: B)",
-  "estimatedHoursAfter": 24.0,
+  "estimatedHoursAfter": 23.5,
   "adjustedHours": {
-    "MÃ_MÔN": 6.0
+    "MÃ_MÔN": 7.5
   },
   "hoursReductions": [
     {
       "code": "MÃ_MÔN",
-      "oldHours": 8.0,
-      "newHours": 6.0,
-      "saved": 2.0
+      "currentGrade": "Điểm A",
+      "suggestedGrade": "Điểm B",
+      "oldHours": 12.0,
+      "newHours": 7.5,
+      "saved": 4.5
     }
   ],
-  "reason": "Giải thích chi tiết môn nào được giảm bao nhiêu giờ và tổng giờ sau giảm",
+  "reason": "Giải thích chi tiết chuyển mốc điểm nào và tổng giờ sau giảm",
   "strategicTips": [
     "Mẹo 1 phân bổ thời gian học tập",
     "Mẹo 2 chuẩn bị đồ án môn học"
@@ -436,7 +467,7 @@ Hãy phân tích và trả về DUY NHẤT một chuỗi JSON hợp lệ theo c�
         suggestedGradeTarget: 'B',
         estimatedHoursAfter: calculatedAfter,
         reason:
-            'Hoán đổi môn ${prereqConflictCourse.code} sang môn thay thế $suggestedCode '
+            'Gợi ý hoán đổi môn ${prereqConflictCourse.code} sang môn $suggestedCode '
             '(khối lượng nhẹ ${suggestedHours.toInt()}h/tuần, đủ điều kiện tiên quyết) '
             'giúp đưa tổng giờ tự học về ${calculatedAfter.toInt()}h/tuần (Cân bằng ✅).',
         strategicTips: [
@@ -450,50 +481,54 @@ Hãy phân tích và trả về DUY NHẤT một chuỗi JSON hợp lệ theo c�
     if (state.isOverloaded) {
       final totalH = state.totalHours;
 
-      // TRƯỜNG HỢP 1: ƯU TIÊN HÀNG ĐẦU -> GIẢM GIỜ TỰ HỌC CÁC MÔN NẶNG (khi <= 31.5h)
+      // TRƯỜNG HỢP 1: ƯU TIÊN HÀNG ĐẦU -> GỢI Ý CHUYỂN MỤC TIÊU ĐIỂM (A -> B HOẶC B -> QUA MÔN)
       if (totalH <= 31.5) {
-        const double targetSafeTotal = 24.0;
-        final double neededReduction = totalH - targetSafeTotal;
-
         final sortedCourses = List<CourseModel>.from(state.plan.selectedCourses)
           ..sort((a, b) => b.plannedSelfStudyHours.compareTo(a.plannedSelfStudyHours));
 
         final adjustedHours = <String, double>{};
         final hoursReductions = <Map<String, dynamic>>[];
-        double remainingReduction = neededReduction;
+        double currentSum = totalH;
 
         for (final c in sortedCourses) {
-          if (remainingReduction <= 0) break;
-          // Mức sàn giờ tự học tối thiểu cho mỗi môn
-          final double minFloor = (c.credits * 1.5).clamp(3.0, 5.0);
-          final double maxCanReduce = (c.plannedSelfStudyHours - minFloor).clamp(0.0, 10.0);
-          if (maxCanReduce <= 0) continue;
+          if (currentSum <= state.maxSafeThresholdHours) break;
 
-          double reduceAmount = remainingReduction > maxCanReduce ? maxCanReduce : remainingReduction;
-          reduceAmount = (reduceAmount * 2).round() / 2.0; // Làm tròn bước 0.5h
-          if (reduceAmount <= 0) continue;
+          final currentTarget = GradeTargetOption.fromCode(c.selectedGradeTarget);
+          GradeTargetOption? nextTarget;
 
-          final double newHours = c.plannedSelfStudyHours - reduceAmount;
-          adjustedHours[c.code] = newHours;
-          hoursReductions.add({
-            'code': c.code,
-            'oldHours': c.plannedSelfStudyHours,
-            'newHours': newHours,
-            'saved': reduceAmount,
-          });
-          remainingReduction -= reduceAmount;
+          if (currentTarget == GradeTargetOption.gradeA) {
+            nextTarget = GradeTargetOption.gradeB;
+          } else if (currentTarget == GradeTargetOption.gradeB) {
+            nextTarget = GradeTargetOption.pass;
+          }
+
+          if (nextTarget != null) {
+            final oldH = currentTarget.hoursFor(c);
+            final newH = nextTarget.hoursFor(c);
+            final saved = oldH - newH;
+
+            if (saved > 0) {
+              adjustedHours[c.code] = newH;
+              hoursReductions.add({
+                'code': c.code,
+                'name': c.name,
+                'currentGrade': currentTarget.title,
+                'suggestedGrade': nextTarget.title,
+                'oldHours': oldH,
+                'newHours': newH,
+                'saved': saved,
+              });
+              currentSum -= saved;
+            }
+          }
         }
 
         if (hoursReductions.isNotEmpty) {
-          final totalReduced = hoursReductions.fold<double>(
-            0.0,
-            (acc, r) => acc + (r['saved'] as double),
-          );
-          final double calculatedAfter = (totalH - totalReduced).clamp(12.0, 25.0);
+          final double calculatedAfter = currentSum.clamp(12.0, 25.0);
 
           final reductionDesc = hoursReductions
               .map((r) =>
-                  '${r['code']} (giảm từ ${r['oldHours']}h xuống ${r['newHours']}h/tuần, -${r['saved']}h)')
+                  '${r['code']} (chuyển từ ${r['currentGrade']} [${GradeTargetOption.formatHours(r['oldHours'])}] sang ${r['suggestedGrade']} [${GradeTargetOption.formatHours(r['newHours'])}, giảm ${GradeTargetOption.formatHours(r['saved'])}/tuần])')
               .join('; ');
 
           return AiPlanAdviceModel(
@@ -502,17 +537,17 @@ Hãy phân tích và trả về DUY NHẤT một chuỗi JSON hợp lệ theo c�
             analysis:
                 'Tổng khối lượng tự học hiện tại là ${totalH.toStringAsFixed(1)}h/tuần, '
                 'vượt ngưỡng an toàn khuyến cáo (${state.maxSafeThresholdHours.toInt()}h/tuần). '
-                'Các môn học đều đạt điều kiện tiên quyết, giải pháp tối ưu là điều chỉnh giảm bớt thời lượng tự học của các môn nặng.',
+                'Các môn học đều đạt điều kiện tiên quyết, giải pháp tối ưu là chuyển mốc mục tiêu điểm của các môn nặng để đưa về mốc giờ chuẩn an toàn.',
             recommendedAction: 'reduce_hours',
             estimatedHoursAfter: calculatedAfter,
             adjustedHours: adjustedHours,
             hoursReductions: hoursReductions,
             reason:
-                'Điều chỉnh giảm thời gian tự học: $reductionDesc. '
-                'Giúp hạ tổng khối lượng tự học về ${calculatedAfter.toStringAsFixed(1)}h/tuần, đạt chuẩn cân bằng an toàn.',
+                'Gợi ý chuyển mốc mục tiêu điểm: $reductionDesc. '
+                'Giúp hạ tổng khối lượng tự học về ${calculatedAfter.toStringAsFixed(1)}h/tuần, đạt chuẩn an toàn dưới ngưỡng 25h.',
             strategicTips: [
-              'Tối ưu hóa thời gian bằng phương pháp Pomodoro và học nhóm để hoàn thành bài tập nhanh hơn.',
-              'Tận dụng tài liệu tóm tắt và slide bài giảng để nắm chắc cốt lõi thay vì phân bổ quá nhiều giờ tự bơi.',
+              'Vào màn hình "Môn Đã Chọn", chạm vào thẻ môn để tự chọn mốc mục tiêu điểm phù hợp.',
+              'Mục tiêu Điểm B vẫn đảm bảo kết quả học tập khá/giỏi (GPA 7.0+) và giúp giải phóng quỹ thời gian tự học.',
             ],
           );
         }

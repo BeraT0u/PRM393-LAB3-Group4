@@ -75,52 +75,6 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
     }
   }
 
-  void _applyAiSuggestion(AiPlanAdviceModel advice) {
-    final catalogState = ref.read(courseCatalogViewModelProvider);
-    List<CourseModel> allCourses =
-        catalogState.value?.allCourses ?? DatabaseSeeder.sampleCourses;
-    if (allCourses.isEmpty) {
-      allCourses = DatabaseSeeder.sampleCourses;
-    }
-
-    final planNotifier = ref.read(planAnalyzerViewModelProvider.notifier);
-
-    String actionMsg = 'Lộ trình đã cân bằng';
-    if (advice.isReduceHours && advice.adjustedHours.isNotEmpty) {
-      planNotifier.updateMultipleCourseHours(advice.adjustedHours);
-      actionMsg = 'Đã tự động điều chỉnh giảm giờ tự học';
-    } else if (advice.isDrop && advice.targetCourseCode != null) {
-      planNotifier.removeCourseByCode(advice.targetCourseCode!);
-      actionMsg = 'Đã bớt môn ${advice.targetCourseCode} khỏi kỳ này';
-    } else if (advice.isReplace) {
-      CourseModel? replacementCourse;
-      if (advice.suggestedCourseCode != null) {
-        replacementCourse = allCourses.cast<CourseModel?>().firstWhere(
-              (c) => c?.code == advice.suggestedCourseCode,
-              orElse: () => null,
-            );
-      }
-      planNotifier.replaceConflictCourse(
-        replacement: replacementCourse,
-        targetCodeToReplace: advice.targetCourseCode,
-      );
-      actionMsg = 'Đã hoán đổi sang môn ${advice.suggestedCourseCode ?? 'thay thế'}';
-    }
-
-    Navigator.of(context).pop();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '🎉 Đã áp dụng gợi ý của ${advice.providerDisplayName}! '
-          '$actionMsg (${advice.estimatedHoursAfter.toInt()}h/tuần).',
-        ),
-        backgroundColor: AppColors.successBorder,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -353,9 +307,18 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
                   runSpacing: 8,
                   children: advice.hoursReductions.map((r) {
                     final code = r['code'] as String? ?? '';
+                    final currentGrade = r['currentGrade'] as String? ?? '';
+                    final suggestedGrade = r['suggestedGrade'] as String? ?? '';
                     final oldH = (r['oldHours'] as num?)?.toDouble() ?? 0.0;
                     final newH = (r['newHours'] as num?)?.toDouble() ?? 0.0;
                     final saved = (r['saved'] as num?)?.toDouble() ?? (oldH - newH);
+
+                    final oldLabel = currentGrade.isNotEmpty
+                        ? '$currentGrade (${oldH.toStringAsFixed(oldH.truncateToDouble() == oldH ? 0 : 1)}h)'
+                        : '${oldH.toStringAsFixed(oldH.truncateToDouble() == oldH ? 0 : 1)}h';
+                    final newLabel = suggestedGrade.isNotEmpty
+                        ? '$suggestedGrade (${newH.toStringAsFixed(newH.truncateToDouble() == newH ? 0 : 1)}h/tuần)'
+                        : '${newH.toStringAsFixed(newH.truncateToDouble() == newH ? 0 : 1)}h/tuần';
 
                     return Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -377,7 +340,7 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '${oldH.toStringAsFixed(oldH.truncateToDouble() == oldH ? 0 : 1)}h',
+                            oldLabel,
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.dangerText,
@@ -389,7 +352,7 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
                             child: Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF16A34A)),
                           ),
                           Text(
-                            '${newH.toStringAsFixed(newH.truncateToDouble() == newH ? 0 : 1)}h/tuần',
+                            newLabel,
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
@@ -494,6 +457,39 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
                 advice.reason,
                 style: const TextStyle(fontSize: 12, color: Color(0xFF374151), height: 1.3),
               ),
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.touch_app_outlined, size: 16, color: Color(0xFF15803D)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        advice.isReduceHours
+                            ? '👉 Hướng dẫn: Bạn có thể vào "Môn Đã Chọn", chạm vào thẻ môn để chuyển mục tiêu điểm sang Điểm B hoặc Qua môn.'
+                            : (advice.isReplace
+                                ? '👉 Hướng dẫn: Bạn có thể vào "Môn Đã Chọn" để xóa môn ${advice.targetCourseCode ?? ''} và thêm môn ${advice.suggestedCourseCode ?? ''} trong danh mục môn học.'
+                                : (advice.isDrop
+                                    ? '👉 Hướng dẫn: Bạn có thể vào "Môn Đã Chọn", chạm biểu tượng thùng rác để gỡ môn ${advice.targetCourseCode ?? ''}.'
+                                    : '👉 Lộ trình học tập của bạn đang ở mức an toàn.')),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF166534),
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -518,34 +514,27 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
 
         const SizedBox(height: AppSpacing.lg),
 
-        // Action Buttons
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: AppColors.borderStructural),
-                ),
-                child: const Text('Để sau'),
+        // Action Button: Duy nhất nút Đồng ý
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: ElevatedButton.icon(
-                onPressed: () => _applyAiSuggestion(advice),
-                icon: const Icon(Icons.check_circle_outline, size: 18),
-                label: const Text('Áp Dụng Gợi Ý Này'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+            child: const Text(
+              'Đồng ý',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ],
+          ),
         ),
       ],
     );

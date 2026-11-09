@@ -118,9 +118,17 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       safeHours = 25.0;
     }
 
-    final initialPlan = _planService
+    final rawPlan = _planService
         .getLocalDraftPlan(userId: uid, maxSafeThresholdHours: safeHours)
         .copyWith(maxSafeThresholdHours: safeHours);
+    final normalizedSelected = _normalizeCourses(rawPlan.selectedCourses);
+    final initialPlan = rawPlan.copyWith(
+      selectedCourses: normalizedSelected,
+      tuitionFee: _calculateTuition(normalizedSelected),
+    );
+    if (normalizedSelected != rawPlan.selectedCourses) {
+      _planService.saveLocalDraftPlan(initialPlan);
+    }
 
     final cachedProfile = ref.read(completedCoursesViewModelProvider).value?.profile;
     final fallbackStudent = cachedProfile ??
@@ -216,12 +224,12 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
       if (state.plan.userId == uid) {
         // Loại bỏ môn đã hoàn thành/đạt khỏi kế hoạch nếu trước đó lỡ thêm vào
-        final currentSelected = state.plan.selectedCourses
+        final currentSelected = _normalizeCourses(state.plan.selectedCourses
             .where((c) => !merged.contains(c.code))
-            .toList();
-        final loadedSelected = loadedPlan.selectedCourses
+            .toList());
+        final loadedSelected = _normalizeCourses(loadedPlan.selectedCourses
             .where((c) => !merged.contains(c.code))
-            .toList();
+            .toList());
 
         final bool preferCloudLoaded = loadedSelected.isNotEmpty &&
             (currentSelected.isEmpty ||
@@ -298,6 +306,20 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     state = state.copyWith(plan: updatedPlan);
   }
 
+  /// Khắc phục lỗi dữ liệu giờ tự học bị AI ghi đè tùy ý ở phiên bản cũ
+  /// (Ví dụ: môn có mục tiêu Điểm A nhưng bị giảm giờ xuống thấp hơn giờ chuẩn của Điểm A)
+  static List<CourseModel> _normalizeCourses(List<CourseModel> courses) {
+    return courses.map((c) {
+      if (c.selectedGradeTarget == 'A' &&
+          c.plannedSelfStudyHours < (c.defaultSelfStudyHours - 0.1)) {
+        return c.copyWith(
+          plannedSelfStudyHours: c.defaultSelfStudyHours.toDouble(),
+        );
+      }
+      return c;
+    }).toList();
+  }
+
   /// Tính lại học phí dựa trên tổng tín chỉ (950.000đ / tín chỉ)
   int _calculateTuition(List<CourseModel> courses) {
     final credits = courses.fold<int>(0, (sum, c) => sum + c.credits);
@@ -313,20 +335,25 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       return;
     }
 
-    final currentCourses = List<CourseModel>.from(state.plan.selectedCourses);
+    final target = GradeTargetOption.fromCode(incomingCourse.selectedGradeTarget);
+    final normalizedIncoming = incomingCourse.copyWith(
+      plannedSelfStudyHours: target.hoursFor(incomingCourse),
+    );
+
+    final currentCourses = _normalizeCourses(state.plan.selectedCourses);
     final existingIndex =
-        currentCourses.indexWhere((c) => c.code == incomingCourse.code);
+        currentCourses.indexWhere((c) => c.code == normalizedIncoming.code);
 
     // Tránh áp dụng và log analytics lặp lại nếu môn học đã được cập nhật y hệt ngay trước khi điều hướng
     if (existingIndex >= 0) {
       final existing = currentCourses[existingIndex];
-      if (existing.selectedGradeTarget == incomingCourse.selectedGradeTarget &&
-          existing.plannedSelfStudyHours == incomingCourse.plannedSelfStudyHours) {
+      if (existing.selectedGradeTarget == normalizedIncoming.selectedGradeTarget &&
+          existing.plannedSelfStudyHours == normalizedIncoming.plannedSelfStudyHours) {
         return;
       }
-      currentCourses[existingIndex] = incomingCourse;
+      currentCourses[existingIndex] = normalizedIncoming;
     } else {
-      currentCourses.add(incomingCourse);
+      currentCourses.add(normalizedIncoming);
     }
 
     final updatedPlan = state.plan.copyWith(
@@ -341,9 +368,9 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     state = state.copyWith(plan: updatedPlan, errorMessage: null);
 
     _analyticsService.logAddCourseToPlan(
-      courseId: incomingCourse.code,
-      targetGrade: incomingCourse.selectedGradeTarget,
-      weeklyHours: incomingCourse.plannedSelfStudyHours,
+      courseId: normalizedIncoming.code,
+      targetGrade: normalizedIncoming.selectedGradeTarget,
+      weeklyHours: normalizedIncoming.plannedSelfStudyHours,
     );
 
     if (state.hasConflict && state.conflictCourse != null) {
@@ -406,9 +433,10 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       updatedCourses.add(targetReplacement);
     }
 
+    final normalizedUpdated = _normalizeCourses(updatedCourses);
     final resolvedPlan = state.plan.copyWith(
-      selectedCourses: updatedCourses,
-      tuitionFee: _calculateTuition(updatedCourses),
+      selectedCourses: normalizedUpdated,
+      tuitionFee: _calculateTuition(normalizedUpdated),
       isSaved: false,
       status: 'draft',
       updatedAt: DateTime.now(),
@@ -459,8 +487,8 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
   /// Bớt một môn học theo mã môn (phục vụ gợi ý bớt môn khi cực kỳ quá tải)
   void removeCourseByCode(String courseCode) {
-    final updatedCourses =
-        state.plan.selectedCourses.where((c) => c.code != courseCode).toList();
+    final updatedCourses = _normalizeCourses(
+        state.plan.selectedCourses.where((c) => c.code != courseCode).toList());
     final updatedPlan = state.plan.copyWith(
       selectedCourses: updatedCourses,
       tuitionFee: _calculateTuition(updatedCourses),

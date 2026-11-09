@@ -77,6 +77,9 @@ class AiPlanAdviceModel {
         if (r is Map) {
           hoursReductions.add({
             'code': r['code']?.toString() ?? '',
+            'name': r['name']?.toString() ?? '',
+            'currentGrade': r['currentGrade']?.toString() ?? 'Điểm A',
+            'suggestedGrade': r['suggestedGrade']?.toString() ?? 'Điểm B',
             'oldHours': (r['oldHours'] as num?)?.toDouble() ?? 0.0,
             'newHours': (r['newHours'] as num?)?.toDouble() ?? 0.0,
             'saved': (r['saved'] as num?)?.toDouble() ?? 0.0,
