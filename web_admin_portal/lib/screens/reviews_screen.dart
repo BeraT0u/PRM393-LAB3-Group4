@@ -890,29 +890,31 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                         ),
                     ],
 
-                    // Action Buttons
-                    const Divider(height: 1, color: AppColors.borderStructural),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () => _showReviewDialog(plan, false),
-                            icon: const Icon(Icons.close, size: 16, color: AppColors.dangerText),
-                            label: const Text('Yêu Cầu Sửa', style: TextStyle(color: AppColors.dangerText)),
-                            style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.dangerBorder)),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            onPressed: () => _showReviewDialog(plan, true),
-                            icon: const Icon(Icons.check, size: 16),
-                            label: const Text('Phê Duyệt Kế Hoạch'),
-                            style: ElevatedButton.styleFrom(backgroundColor: AppColors.successText, foregroundColor: Colors.white),
-                          ),
-                        ],
+                    // Action Buttons (Chỉ hiển thị khi kế hoạch đang chờ duyệt)
+                    if (plan.isPending) ...[
+                      const Divider(height: 1, color: AppColors.borderStructural),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _showReviewDialog(plan, false),
+                              icon: const Icon(Icons.close, size: 16, color: AppColors.dangerText),
+                              label: const Text('Yêu Cầu Sửa', style: TextStyle(color: AppColors.dangerText)),
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.dangerBorder)),
+                            ),
+                            const SizedBox(width: 12),
+                            ElevatedButton.icon(
+                              onPressed: () => _showReviewDialog(plan, true),
+                              icon: const Icon(Icons.check, size: 16),
+                              label: const Text('Phê Duyệt Kế Hoạch'),
+                              style: ElevatedButton.styleFrom(backgroundColor: AppColors.successText, foregroundColor: Colors.white),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               );
@@ -1209,27 +1211,25 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                                 style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                               ),
                             ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            onPressed: () => _showAcceptanceDialog(plan, false),
-                            icon: const Icon(Icons.close, size: 16, color: AppColors.dangerText),
-                            label: const Text('Yêu Cầu Sửa Điểm', style: TextStyle(color: AppColors.dangerText)),
-                            style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.dangerBorder)),
-                          ),
-                          const SizedBox(width: 10),
-                          ElevatedButton.icon(
-                            onPressed: () => _showAcceptanceDialog(plan, true),
-                            icon: const Icon(Icons.verified, size: 16),
-                            label: Text(
-                              plan.isCompleted
-                                  ? 'Cập Nhật Nghiệm Thu'
-                                  : 'Phê Duyệt & Cộng Tín Chỉ',
+                          if (plan.isPendingAcceptance) ...[
+                            const SizedBox(width: 12),
+                            OutlinedButton.icon(
+                              onPressed: () => _showAcceptanceDialog(plan, false),
+                              icon: const Icon(Icons.close, size: 16, color: AppColors.dangerText),
+                              label: const Text('Yêu Cầu Sửa Điểm', style: TextStyle(color: AppColors.dangerText)),
+                              style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.dangerBorder)),
                             ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF7E22CE),
-                              foregroundColor: Colors.white,
+                            const SizedBox(width: 10),
+                            ElevatedButton.icon(
+                              onPressed: () => _showAcceptanceDialog(plan, true),
+                              icon: const Icon(Icons.verified, size: 16),
+                              label: const Text('Phê Duyệt & Cộng Tín Chỉ'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF7E22CE),
+                                foregroundColor: Colors.white,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
