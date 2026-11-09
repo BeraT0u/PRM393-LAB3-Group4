@@ -7,6 +7,8 @@ import 'storage_service.dart';
 import 'analytics_service.dart';
 import 'pdf_report_service.dart';
 import 'ai_advisor_service.dart';
+import 'announcement_service.dart';
+import '../models/announcement_model.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
@@ -38,4 +40,14 @@ final pdfReportServiceProvider = Provider<PdfReportService>((ref) {
 
 final aiAdvisorServiceProvider = Provider<AiAdvisorService>((ref) {
   return AiAdvisorService();
+});
+
+final announcementServiceProvider = Provider<AnnouncementService>((ref) {
+  return AnnouncementService();
+});
+
+final announcementsStreamProvider =
+    StreamProvider<List<AnnouncementModel>>((ref) {
+  final service = ref.watch(announcementServiceProvider);
+  return service.streamAnnouncements();
 });

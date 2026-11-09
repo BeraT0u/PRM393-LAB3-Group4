@@ -3,6 +3,8 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../models/announcement_model.dart';
 import '../models/student_profile_model.dart';
 import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
@@ -355,6 +357,434 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  static Color _getCategoryColor(String category) {
+    switch (category) {
+      case 'Lịch thi':
+        return const Color(0xFFC2410C);
+      case 'Cảnh báo tải':
+        return AppColors.dangerBorder;
+      case 'Hệ thống':
+        return const Color(0xFF7C3AED);
+      case 'Học vụ':
+      default:
+        return AppColors.primaryBlue;
+    }
+  }
+
+  static Color _getCategoryBgColor(String category) {
+    switch (category) {
+      case 'Lịch thi':
+        return const Color(0xFFFFF7ED);
+      case 'Cảnh báo tải':
+        return const Color(0xFFFEF2F2);
+      case 'Hệ thống':
+        return const Color(0xFFF5F3FF);
+      case 'Học vụ':
+      default:
+        return const Color(0xFFEFF6FF);
+    }
+  }
+
+  static String _formatAnnouncementDate(DateTime? dt) {
+    if (dt == null) return 'Vừa xong';
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 60) {
+      return diff.inMinutes <= 1 ? 'Vừa xong' : '${diff.inMinutes} phút trước';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours} giờ trước';
+    }
+    if (diff.inDays < 7) {
+      return '${diff.inDays} ngày trước';
+    }
+    return DateFormat('dd/MM/yyyy HH:mm').format(dt);
+  }
+
+  /// Mở Modal Popup danh sách thông báo từ Ban Giảng Huấn & Web Admin
+  void _showAnnouncementsPopup(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.canvasBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+      ),
+      builder: (sheetCtx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.45,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (ctx, scrollController) {
+            return Consumer(
+              builder: (consumerCtx, watchRef, _) {
+                final announcementsAsync =
+                    watchRef.watch(announcementsStreamProvider);
+
+                return Column(
+                  children: [
+                    // Handle bar
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.borderStructural,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryBlueTonal,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.notifications_active_rounded,
+                              color: AppColors.primaryBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.md),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Hộp Thư Thông Báo',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  'Từ Ban Giảng Huấn & Cố Vấn Học Tập',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                            onPressed: () => Navigator.of(sheetCtx).pop(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: AppColors.borderStructural),
+                    // Body
+                    Expanded(
+                      child: announcementsAsync.when(
+                        loading: () => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                        error: (err, stack) => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.error_outline_rounded,
+                                  size: 44,
+                                  color: AppColors.dangerBorder,
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                Text(
+                                  'Không thể tải thông báo: $err',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        data: (items) {
+                          if (items.isEmpty) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.xxl),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.notifications_none_rounded,
+                                      size: 52,
+                                      color: AppColors.textSecondary
+                                          .withValues(alpha: 0.6),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                    const Text(
+                                      'Chưa có thông báo nào',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.xs),
+                                    const Text(
+                                      'Các thông báo học vụ từ Web Admin Portal sẽ hiển thị trực tiếp tại đây.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+
+                          return ListView.separated(
+                            controller: scrollController,
+                            padding: const EdgeInsets.all(AppSpacing.lg),
+                            itemCount: items.length,
+                            separatorBuilder: (_, index) =>
+                                const SizedBox(height: AppSpacing.md),
+                            itemBuilder: (ctx, i) {
+                              final ann = items[i];
+                              return _buildAnnouncementCard(ctx, ann);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildAnnouncementCard(BuildContext context, AnnouncementModel ann) {
+    final catColor = _getCategoryColor(ann.category);
+    final catBg = _getCategoryBgColor(ann.category);
+    final dateStr = _formatAnnouncementDate(ann.createdAt);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      onTap: () => _showAnnouncementDetailDialog(context, ann),
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceCard,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.borderStructural),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Category, Target semester & Date row
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: catBg,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: catColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    ann.category,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: catColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.canvasBg,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.borderStructural),
+                  ),
+                  child: Text(
+                    ann.targetSemester,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  dateStr,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            // Title
+            Text(
+              ann.title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+                height: 1.3,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            // Author
+            Row(
+              children: [
+                const Icon(
+                  Icons.person_outline_rounded,
+                  size: 13,
+                  color: AppColors.textSecondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  ann.authorName,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textSecondary,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            // Body preview
+            Text(
+              ann.body,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: AppColors.textPrimary,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAnnouncementDetailDialog(
+      BuildContext context, AnnouncementModel ann) {
+    final catColor = _getCategoryColor(ann.category);
+    final catBg = _getCategoryBgColor(ann.category);
+
+    showDialog<void>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        backgroundColor: AppColors.surfaceCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: catBg,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: catColor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    ann.category,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: catColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    ann.targetSemester,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                  onPressed: () => Navigator.of(dlgCtx).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              ann.title,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Từ: ${ann.authorName} • ${_formatAnnouncementDate(ann.createdAt)}',
+              style: const TextStyle(
+                fontSize: 11.5,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Text(
+            ann.body,
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: AppColors.textPrimary,
+              height: 1.5,
+            ),
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dlgCtx).pop(),
+            child: const Text('Đã hiểu'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showLogoutConfirmDialog(BuildContext context, WidgetRef ref) {
     showDialog<void>(
       context: context,
@@ -423,6 +853,7 @@ class ProfileScreen extends ConsumerWidget {
         DatabaseSeeder.getStudentByUid(uid);
     final vm = ref.read(completedCoursesViewModelProvider.notifier);
     final planState = ref.watch(planAnalyzerViewModelProvider);
+    final announcementsAsync = ref.watch(announcementsStreamProvider);
 
     return MainScaffold(
       currentTabIndex: 3,
@@ -431,12 +862,30 @@ class ProfileScreen extends ConsumerWidget {
         subtitle: 'SCR-08: Thông tin sinh viên & Cài đặt',
         actions: [
           IconButton(
-            tooltip: 'Chỉnh sửa thông tin cá nhân',
-            onPressed: () => _showEditProfileSheet(context, ref, profile),
-            icon: const Icon(
-              Icons.edit_outlined,
-              color: AppColors.primaryBlue,
-            ),
+            tooltip: 'Hộp thư thông báo',
+            onPressed: () => _showAnnouncementsPopup(context, ref),
+            icon: (announcementsAsync.value != null && announcementsAsync.value!.isNotEmpty)
+                ? Badge(
+                    label: Text(
+                      '${announcementsAsync.value!.length}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    backgroundColor: AppColors.dangerBorder,
+                    child: const Icon(
+                      Icons.notifications_outlined,
+                      color: AppColors.primaryBlue,
+                      size: 24,
+                    ),
+                  )
+                : const Icon(
+                    Icons.notifications_outlined,
+                    color: AppColors.primaryBlue,
+                    size: 24,
+                  ),
           ),
         ],
       ),
