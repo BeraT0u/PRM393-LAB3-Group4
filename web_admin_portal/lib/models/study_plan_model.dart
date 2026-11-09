@@ -145,15 +145,15 @@ class StudyPlanModel {
 
     // Fallback thông tin persona mẫu theo userId
     if (rawUserId == 'student_se180504' || rawUserId.contains('se180504')) {
-      if (resolvedName.isEmpty || resolvedName == 'Sinh viên') resolvedName = 'Trần Hoàng Long';
+      if (resolvedName.isEmpty || resolvedName == 'Sinh viên' || resolvedName == 'Sinh viên mới') resolvedName = 'Trần Hoàng Long';
       if (resolvedCode.isEmpty) resolvedCode = 'SE180504';
       if (resolvedEmail.isEmpty) resolvedEmail = 'longth.se180504@gmail.com';
     } else if (rawUserId == 'student_se170123' || rawUserId.contains('se170123')) {
-      if (resolvedName.isEmpty || resolvedName == 'Sinh viên') resolvedName = 'Nguyễn Mai Linh';
+      if (resolvedName.isEmpty || resolvedName == 'Sinh viên' || resolvedName == 'Sinh viên mới') resolvedName = 'Nguyễn Mai Linh';
       if (resolvedCode.isEmpty) resolvedCode = 'SE170123';
       if (resolvedEmail.isEmpty) resolvedEmail = 'linhnm.se170123@gmail.com';
     } else if (rawUserId == 'student_se190456' || rawUserId.contains('se190456')) {
-      if (resolvedName.isEmpty || resolvedName == 'Sinh viên') resolvedName = 'Lê Minh Tuấn';
+      if (resolvedName.isEmpty || resolvedName == 'Sinh viên' || resolvedName == 'Sinh viên mới') resolvedName = 'Lê Minh Tuấn';
       if (resolvedCode.isEmpty) resolvedCode = 'SE190456';
       if (resolvedEmail.isEmpty) resolvedEmail = 'tuanlm.se190456@gmail.com';
     }
@@ -161,19 +161,19 @@ class StudyPlanModel {
     // Tự động trích xuất MSSV từ email hoặc userId nếu MSSV chưa có
     if (resolvedCode.isEmpty) {
       final codeMatch = RegExp(r'(se|sa|ss|sb|cs|ia|he|hs|ha|de)\d{5,7}', caseSensitive: false)
-          .firstMatch('$rawUserId $resolvedEmail');
+          .firstMatch('$rawUserId $resolvedEmail $resolvedName');
       if (codeMatch != null) {
         resolvedCode = codeMatch.group(0)!.toUpperCase();
       }
     }
 
     // Tự động nhận diện tên từ email nếu tên trống hoặc mặc định
-    if ((resolvedName.isEmpty || resolvedName == 'Sinh viên') && resolvedEmail.isNotEmpty) {
+    if ((resolvedName.isEmpty || resolvedName == 'Sinh viên' || resolvedName == 'Sinh viên mới') && resolvedEmail.isNotEmpty) {
       final prefix = resolvedEmail.split('@').first;
       resolvedName = prefix.replaceAll(RegExp(r'[^a-zA-Z0-9]'), ' ').trim();
     }
 
-    if (resolvedName.isEmpty) {
+    if (resolvedName.isEmpty || resolvedName == 'Sinh viên mới') {
       resolvedName = 'Sinh viên';
     }
 

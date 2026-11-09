@@ -660,6 +660,7 @@ class StudentService {
         'userId': uid,
         'studentName': profile.fullName,
         'studentCode': profile.studentId,
+        'studentEmail': profile.email ?? '',
         'semesterName': semesterName,
         'courses': existingCourses,
         'submittedGrades': existingGrades,
