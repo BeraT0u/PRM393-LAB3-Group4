@@ -234,6 +234,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
                 selectedCourses: loadedSelected,
                 studentName: profile.fullName,
                 studentCode: profile.studentId,
+                studentEmail: profile.email ?? '',
                 targetGpa: profile.targetGpa > 0
                     ? profile.targetGpa
                     : loadedPlan.targetGpa,
@@ -245,6 +246,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
                 selectedCourses: currentSelected,
                 studentName: profile.fullName,
                 studentCode: profile.studentId,
+                studentEmail: profile.email ?? '',
                 targetGpa: profile.targetGpa > 0
                     ? profile.targetGpa
                     : state.plan.targetGpa,
@@ -537,6 +539,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       final planToSave = state.plan.copyWith(
         studentName: cachedProfile.fullName,
         studentCode: cachedProfile.studentId,
+        studentEmail: cachedProfile.email ?? '',
         isSaved: true,
         status: 'pending',
         isCompleted: false,

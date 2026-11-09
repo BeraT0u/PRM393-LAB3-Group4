@@ -5,6 +5,7 @@ class StudyPlanModel {
   final String userId;
   final String studentName;
   final String studentCode;
+  final String studentEmail;
   final String semesterName;
   final List<CourseModel> selectedCourses;
   final double maxSafeThresholdHours;
@@ -24,6 +25,7 @@ class StudyPlanModel {
     required this.userId,
     this.studentName = '',
     this.studentCode = '',
+    this.studentEmail = '',
     this.semesterName = 'Fall 2024',
     required this.selectedCourses,
     this.maxSafeThresholdHours = 25.0,
@@ -79,6 +81,7 @@ class StudyPlanModel {
     String? userId,
     String? studentName,
     String? studentCode,
+    String? studentEmail,
     String? semesterName,
     List<CourseModel>? selectedCourses,
     double? maxSafeThresholdHours,
@@ -98,6 +101,7 @@ class StudyPlanModel {
       userId: userId ?? this.userId,
       studentName: studentName ?? this.studentName,
       studentCode: studentCode ?? this.studentCode,
+      studentEmail: studentEmail ?? this.studentEmail,
       semesterName: semesterName ?? this.semesterName,
       selectedCourses: selectedCourses ?? this.selectedCourses,
       maxSafeThresholdHours:
@@ -121,6 +125,7 @@ class StudyPlanModel {
       'userId': userId,
       if (studentName.isNotEmpty) 'studentName': studentName,
       if (studentCode.isNotEmpty) 'studentCode': studentCode,
+      if (studentEmail.isNotEmpty) 'studentEmail': studentEmail,
       'semesterName': semesterName,
       'courses': selectedCourses.map((c) => c.toMap()).toList(),
       'totalCredits': totalCredits,
@@ -180,6 +185,7 @@ class StudyPlanModel {
           (map['fullName'] as String? ?? ''),
       studentCode: map['studentCode'] as String? ??
           (map['studentId'] as String? ?? ''),
+      studentEmail: map['studentEmail'] as String? ?? (map['email'] as String? ?? ''),
       semesterName: map['semesterName'] as String? ?? 'Fall 2024',
       selectedCourses: coursesList,
       maxSafeThresholdHours:
