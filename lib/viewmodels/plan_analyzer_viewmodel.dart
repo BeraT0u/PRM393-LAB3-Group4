@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -238,6 +239,8 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
         final effectivePlan = preferCloudLoaded
             ? loadedPlan.copyWith(
+                id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
+                userId: uid,
                 semesterName: currentSemesterName,
                 selectedCourses: loadedSelected,
                 studentName: profile.fullName,
@@ -250,6 +253,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
               )
             : state.plan.copyWith(
                 id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
+                userId: uid,
                 semesterName: currentSemesterName,
                 selectedCourses: currentSelected,
                 studentName: profile.fullName,
@@ -613,10 +617,30 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
               ref.read(studentServiceProvider).getCachedProfile(uid) ??
               DatabaseSeeder.getStudentByUid(uid);
 
+      final currentAuthUser = Firebase.apps.isNotEmpty
+          ? FirebaseAuth.instance.currentUser
+          : null;
+      final effectiveName = cachedProfile.fullName.isNotEmpty &&
+              cachedProfile.fullName != 'Sinh viên' &&
+              cachedProfile.fullName != 'Sinh viên mới'
+          ? cachedProfile.fullName
+          : (currentAuthUser?.displayName?.isNotEmpty == true
+              ? currentAuthUser!.displayName!
+              : cachedProfile.fullName);
+      final effectiveEmail = (cachedProfile.email != null &&
+              cachedProfile.email!.isNotEmpty)
+          ? cachedProfile.email!
+          : (currentAuthUser?.email ?? '');
+      final effectiveCode = cachedProfile.studentId.isNotEmpty
+          ? cachedProfile.studentId
+          : '';
+
       final planToSave = state.plan.copyWith(
-        studentName: cachedProfile.fullName,
-        studentCode: cachedProfile.studentId,
-        studentEmail: cachedProfile.email ?? '',
+        id: '${uid}_${state.plan.semesterName.replaceAll(' ', '_')}',
+        userId: uid,
+        studentName: effectiveName,
+        studentCode: effectiveCode,
+        studentEmail: effectiveEmail,
         isSaved: true,
         status: 'pending',
         isCompleted: false,

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../models/study_plan_model.dart';
 import '../utils/app_logger.dart';
@@ -188,11 +189,35 @@ class PlanService {
 
   /// Lưu và gửi duyệt kế hoạch học tập lên Cloud Firestore (status = 'pending')
   Future<void> saveStudyPlan(StudyPlanModel plan) async {
-    final normalizedStatus =
-        (plan.status == 'draft' || plan.status == 'rejected')
-            ? 'pending'
-            : plan.status;
+    final currentAuthUid = (Firebase.apps.isNotEmpty &&
+            FirebaseAuth.instance.currentUser != null)
+        ? FirebaseAuth.instance.currentUser!.uid
+        : plan.userId;
+    final effectiveUserId =
+        currentAuthUid.isNotEmpty ? currentAuthUid : plan.userId;
+
+    final currentUser = Firebase.apps.isNotEmpty
+        ? FirebaseAuth.instance.currentUser
+        : null;
+    final effectiveName = plan.studentName.isNotEmpty
+        ? plan.studentName
+        : (currentUser?.displayName ?? '');
+    final effectiveEmail = plan.studentEmail.isNotEmpty
+        ? plan.studentEmail
+        : (currentUser?.email ?? '');
+
+    final normalizedStatus = (plan.status == 'draft' ||
+            plan.status == 'rejected' ||
+            plan.status == 'approved')
+        ? 'pending'
+        : plan.status;
     final planToSave = plan.copyWith(
+      userId: effectiveUserId,
+      id: plan.id.isEmpty
+          ? '${effectiveUserId}_${plan.semesterName.replaceAll(' ', '_')}'
+          : plan.id,
+      studentName: effectiveName,
+      studentEmail: effectiveEmail,
       isSaved: true,
       status: normalizedStatus,
     );
@@ -210,6 +235,7 @@ class PlanService {
       );
     } catch (e, st) {
       AppLogger.error('Lỗi khi lưu StudyPlan lên Firestore', e, st);
+      rethrow;
     }
   }
 }

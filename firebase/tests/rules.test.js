@@ -422,4 +422,21 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
       })
     );
   });
+
+  it('Study Plans (Resubmission): user can modify approved plan and resubmit to pending', async () => {
+    await systemDb.collection('study_plans').doc('plan_approved_modify').set({
+      userId: 'user_123',
+      status: 'approved',
+      semesterName: 'Fall 2026',
+      totalCredits: 12,
+    });
+
+    // Student modifies the plan (e.g. adds course) and resubmits to pending
+    await assertSucceeds(
+      userDb.collection('study_plans').doc('plan_approved_modify').update({
+        status: 'pending',
+        totalCredits: 15,
+      })
+    );
+  });
 });

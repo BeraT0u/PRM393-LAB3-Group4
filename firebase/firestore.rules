@@ -194,9 +194,8 @@ service cloud.firestore {
         request.auth.uid == request.resource.data.userId &&
         request.resource.data.status in ['draft', 'pending', 'pending_acceptance'];
 
-      // Updates:
       // a) Owner student:
-      //    - Can update plan when status in ['draft', 'pending', 'rejected'] and new status in ['draft', 'pending'] (cannot self-approve)
+      //    - Can update/resubmit plan when status in ['draft', 'pending', 'rejected', 'approved'] and new status in ['draft', 'pending'] (cannot self-approve)
       //    - Can submit grades for acceptance/update PDF when status in ['approved', 'pending_acceptance', 'acceptance_rejected'] and new status in ['approved', 'pending_acceptance'] (cannot self-complete)
       // b) Staff/Admin:
       //    - Can review a plan or acceptance request as long as new status in ['approved', 'rejected', 'completed', 'acceptance_rejected'] with reviewReason (>= 3 chars)
@@ -205,7 +204,7 @@ service cloud.firestore {
          request.auth.uid == resource.data.userId &&
          (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
          (
-           (resource.data.status in ['draft', 'pending', 'rejected'] &&
+           (resource.data.status in ['draft', 'pending', 'rejected', 'approved'] &&
             request.resource.data.status in ['draft', 'pending']) ||
            (resource.data.status in ['approved', 'pending_acceptance', 'acceptance_rejected'] &&
             request.resource.data.status in ['approved', 'pending_acceptance'])
