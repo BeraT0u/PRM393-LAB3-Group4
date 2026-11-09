@@ -228,14 +228,31 @@ class HomeScreen extends ConsumerWidget {
                               ? '0 Môn (Bắt đầu)'
                               : (planState.hasConflict
                                   ? '${planState.conflictCount} Xung đột ⚠️'
-                                  : (planState.plan.isSaved
-                                      ? 'Đã lưu Cloud ✅'
-                                      : 'Bản nháp Local ✅')),
+                                  : (!planState.plan.isSaved
+                                      ? 'Bản nháp Local ✅'
+                                      : (Firebase.apps.isEmpty
+                                          ? 'Đã lưu Cloud ✅'
+                                          : (planState.plan.isPending
+                                              ? 'Chờ duyệt ⏳'
+                                              : (planState.plan.isRejected
+                                                  ? 'Yêu cầu sửa ❌'
+                                                  : (planState.plan.isPendingAcceptance
+                                                      ? 'Chờ duyệt điểm ⏳'
+                                                      : (planState.plan.isAcceptanceRejected
+                                                          ? 'Sửa điểm ❌'
+                                                          : 'Đã phê duyệt ✅'))))))),
                           type: planState.courseCount == 0
                               ? StatusBadgeType.neutral
-                              : (planState.hasConflict
+                              : (planState.hasConflict ||
+                                      (Firebase.apps.isNotEmpty &&
+                                          (planState.plan.isRejected ||
+                                              planState.plan.isAcceptanceRejected))
                                   ? StatusBadgeType.danger
-                                  : StatusBadgeType.success),
+                                  : (Firebase.apps.isNotEmpty &&
+                                          (planState.plan.isPending ||
+                                              planState.plan.isPendingAcceptance)
+                                      ? StatusBadgeType.warning
+                                      : StatusBadgeType.success)),
                         ),
                       ],
                     ),
@@ -260,6 +277,41 @@ class HomeScreen extends ConsumerWidget {
                         color: AppColors.textSecondary,
                       ),
                     ),
+                    if (planState.plan.reviewReason != null &&
+                        planState.plan.reviewReason!.trim().isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: (planState.plan.isRejected ||
+                                  planState.plan.isAcceptanceRejected)
+                              ? AppColors.dangerSurface
+                              : AppColors.warningSurface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: (planState.plan.isRejected ||
+                                    planState.plan.isAcceptanceRejected)
+                                ? AppColors.dangerBorder
+                                : AppColors.warningBorder,
+                          ),
+                        ),
+                        child: Text(
+                          '💬 Cố vấn học tập: ${planState.plan.reviewReason}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: (planState.plan.isRejected ||
+                                    planState.plan.isAcceptanceRejected)
+                                ? AppColors.dangerText
+                                : AppColors.warningText,
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.md),
                     Wrap(
                       spacing: AppSpacing.sm,

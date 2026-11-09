@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/completed_course_model.dart';
 import '../models/student_profile_model.dart';
@@ -242,10 +243,9 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
     }
   }
 
-  /// UC-26B: Nghiệm thu kỳ học ("Đã hoàn thành kỳ học")
-  /// Lưu các môn trong kế hoạch vào completed_courses kèm điểm GPA & trạng thái Đạt/Rớt do người dùng chọn
+  /// UC-26B: Gửi yêu cầu nghiệm thu kỳ học & bảng điểm lên Cố vấn học tập (Web Admin)
   Future<bool> completeSemester([List<CourseGradeItem>? courseGrades]) async {
-    if (state.isCompleted) return true;
+    if (state.isCompleted || state.plan.isPendingAcceptance) return true;
     state = state.copyWith(isCompletingSemester: true, errorMessage: null);
 
     try {
@@ -255,11 +255,35 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
         courseGrades: courseGrades,
       );
 
+      final isOnline = Firebase.apps.isNotEmpty;
+      if (isOnline) {
+        final updatedPlan = state.plan.copyWith(
+          isSaved: true,
+          status: 'pending_acceptance',
+          isCompleted: false,
+        );
+        _planService.saveLocalDraftPlan(updatedPlan);
+        ref.invalidate(completedCoursesViewModelProvider);
+
+        state = state.copyWith(
+          isCompletingSemester: false,
+          isCompleted: false,
+          plan: updatedPlan,
+          successMessage:
+              'Đã gửi bảng điểm nghiệm thu! Vui lòng chờ Cố vấn học tập xác nhận trên cổng Web.',
+        );
+        return true;
+      }
+
       final updatedProfile =
           await _studentService.getStudentProfile(state.student.uid);
-      final updatedPlan = state.plan.copyWith(isSaved: true);
+      final updatedPlan = state.plan.copyWith(
+        isSaved: true,
+        status: 'completed',
+        isCompleted: true,
+      );
 
-      // Xóa kế hoạch nháp để sẵn sàng cho kỳ học tiếp theo và cập nhật SCR-03 / SCR-04
+      // Chế độ Offline Unit Test: Xóa kế hoạch nháp và cập nhật SCR-03 / SCR-04
       ref.read(planAnalyzerViewModelProvider.notifier).clearPlan();
       ref.invalidate(completedCoursesViewModelProvider);
       ref.invalidate(courseCatalogViewModelProvider);
@@ -274,8 +298,16 @@ class SemesterSummaryViewModel extends Notifier<SemesterSummaryState> {
       );
       return true;
     } catch (e, st) {
-      AppLogger.warning('Nghiệm thu Cloud thất bại, áp dụng cập nhật cục bộ fallback: $e');
+      AppLogger.warning('Nghiệm thu Cloud thất bại: $e');
       AppLogger.error('Chi tiết lỗi nghiệm thu kỳ học', e, st);
+
+      if (Firebase.apps.isNotEmpty) {
+        state = state.copyWith(
+          isCompletingSemester: false,
+          errorMessage: 'Không thể gửi yêu cầu nghiệm thu: $e',
+        );
+        return false;
+      }
 
       final passedItems = courseGrades?.where((i) => i.isPassed && i.grade >= 4.0) ??
           state.plan.selectedCourses.map((c) => CourseGradeItem(course: c, isPassed: true, grade: 8.0));

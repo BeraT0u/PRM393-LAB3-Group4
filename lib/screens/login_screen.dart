@@ -51,7 +51,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         final credential = await authService.signInWithGoogle();
         if (credential == null || credential.user == null) {
           // Người dùng hủy đăng nhập
-          if (mounted) setState(() => _isLoading = false);
+          if (!mounted) return;
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Đăng nhập thất bại: Bạn đã hủy đăng nhập Google.'),

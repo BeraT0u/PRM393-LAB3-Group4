@@ -5,3 +5,4 @@ export 'app_states.dart';
 export 'course_strategy_card.dart';
 export 'main_scaffold.dart';
 export 'status_badge.dart';
+export 'ai_advisor_modal_sheet.dart';

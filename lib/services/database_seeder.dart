@@ -450,6 +450,7 @@ class DatabaseSeeder {
       targetGpa: 3.65,
       tuitionFee: 14250000,
       isSaved: true,
+      status: 'approved',
       updatedAt: DateTime.now(),
     );
   }

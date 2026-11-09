@@ -106,6 +106,19 @@ class _CompletedCoursesBody extends StatelessWidget {
           ),
         ],
         const SizedBox(height: AppSpacing.lg),
+        if (state.pendingAcceptanceCourses.isNotEmpty) ...[
+          const AppAlertBanner(
+            variant: AlertBannerVariant.warning,
+            message:
+                '⏳ Các môn bên dưới đang chờ Cố vấn học tập xác nhận nghiệm thu trên cổng Web Admin. Tín chỉ & GPA sẽ tự động cộng sau khi được duyệt.',
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final pc in state.pendingAcceptanceCourses) ...[
+            _CompletedCourseTile(course: pc, isPendingAcceptance: true),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          const SizedBox(height: AppSpacing.md),
+        ],
         AppFilterChips(
           categories: state.filterLabels,
           selectedCategory: state.selectedFilter,
@@ -206,8 +219,12 @@ class _ProgressCard extends StatelessWidget {
 
 class _CompletedCourseTile extends StatelessWidget {
   final CompletedCourseModel course;
+  final bool isPendingAcceptance;
 
-  const _CompletedCourseTile({required this.course});
+  const _CompletedCourseTile({
+    required this.course,
+    this.isPendingAcceptance = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -219,9 +236,15 @@ class _CompletedCourseTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: isPendingAcceptance
+            ? AppColors.warningSurface
+            : AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.borderStructural),
+        border: Border.all(
+          color: isPendingAcceptance
+              ? AppColors.warningBorder
+              : AppColors.borderStructural,
+        ),
       ),
       child: Row(
         children: [
@@ -252,7 +275,7 @@ class _CompletedCourseTile extends StatelessWidget {
                       StatusBadge(label: '${course.credits} TC', type: StatusBadgeType.primaryTonal),
                     if (course.grade != null)
                       StatusBadge(
-                        label: 'GPA ${course.gpa4.toStringAsFixed(1)}',
+                        label: 'Điểm ${course.grade!.toStringAsFixed(1)} (${course.effectiveGradeLetter})',
                         type: StatusBadgeType.primaryTonal,
                       ),
                   ],
@@ -261,7 +284,13 @@ class _CompletedCourseTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          if (course.grade != null)
+          if (isPendingAcceptance)
+            const StatusBadge(
+              label: 'Chờ duyệt ⏳',
+              type: StatusBadgeType.warning,
+              icon: Icons.hourglass_top_rounded,
+            )
+          else if (course.grade != null)
             StatusBadge(
               label: 'Điểm ${course.grade!.toStringAsFixed(1)} (${course.effectiveGradeLetter})',
               type: course.isActuallyPassed ? StatusBadgeType.success : StatusBadgeType.danger,
@@ -379,7 +408,7 @@ class _AddCompletedCourseSheetState extends ConsumerState<AddCompletedCourseShee
             ),
             const SizedBox(height: AppSpacing.lg),
             DropdownButtonFormField<int>(
-              value: _semester,
+              initialValue: _semester,
               decoration: const InputDecoration(labelText: 'Kỳ học'),
               items: [
                 for (var s = CompletedCourseRules.minSemester;
@@ -394,7 +423,7 @@ class _AddCompletedCourseSheetState extends ConsumerState<AddCompletedCourseShee
             ),
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<CourseModel>(
-              value: addable.contains(_course) ? _course : null,
+              initialValue: addable.contains(_course) ? _course : null,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Môn học'),
               items: [

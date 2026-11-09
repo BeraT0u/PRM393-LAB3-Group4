@@ -45,6 +45,7 @@ class CompletedCoursesState {
 
   final StudentProfileModel profile;
   final List<CompletedCourseModel> completed;
+  final List<CompletedCourseModel> pendingAcceptanceCourses;
   final Set<String> legacyPassedCodes;
   final List<CourseModel> catalog;
   final String selectedFilter;
@@ -52,6 +53,7 @@ class CompletedCoursesState {
   const CompletedCoursesState({
     required this.profile,
     required this.completed,
+    this.pendingAcceptanceCourses = const [],
     required this.legacyPassedCodes,
     required this.catalog,
     this.selectedFilter = filterAll,
@@ -60,6 +62,7 @@ class CompletedCoursesState {
   CompletedCoursesState copyWith({
     StudentProfileModel? profile,
     List<CompletedCourseModel>? completed,
+    List<CompletedCourseModel>? pendingAcceptanceCourses,
     Set<String>? legacyPassedCodes,
     List<CourseModel>? catalog,
     String? selectedFilter,
@@ -67,6 +70,8 @@ class CompletedCoursesState {
     return CompletedCoursesState(
       profile: profile ?? this.profile,
       completed: completed ?? this.completed,
+      pendingAcceptanceCourses:
+          pendingAcceptanceCourses ?? this.pendingAcceptanceCourses,
       legacyPassedCodes: legacyPassedCodes ?? this.legacyPassedCodes,
       catalog: catalog ?? this.catalog,
       selectedFilter: selectedFilter ?? this.selectedFilter,
@@ -190,6 +195,8 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
 
     final profile = await studentService.getStudentProfile(activeUid);
     final completed = await studentService.getCompletedCourses(activeUid);
+    final pendingAcceptance =
+        await studentService.getPendingAcceptanceCourses(activeUid);
     final catalog = await courseService.getCourses();
 
     final completedCodes = completed.map((c) => c.code).toSet();
@@ -222,6 +229,7 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     var next = CompletedCoursesState(
       profile: syncedProfile,
       completed: completed,
+      pendingAcceptanceCourses: pendingAcceptance,
       legacyPassedCodes: legacy,
       catalog: catalog,
     );
@@ -256,7 +264,10 @@ class CompletedCoursesViewModel extends AsyncNotifier<CompletedCoursesState> {
     return CompletedCourseRules.validateAdd(
       semesterIndex: semesterIndex,
       course: course,
-      completed: current.completed,
+      completed: [
+        ...current.completed,
+        ...current.pendingAcceptanceCourses,
+      ],
       legacyPassedCodes: current.legacyPassedCodes,
     );
   }

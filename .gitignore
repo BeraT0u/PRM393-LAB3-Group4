@@ -54,3 +54,10 @@ package-lock.json
 **/package-lock.json
 **/.dart_tool/
 **/build/
+
+# AI API Keys (Sensitive - Do NOT commit)
+lib/config/ai_api_keys.dart
+
+# Temporary Office / OS lock files
+~$*.pptx
+*.tmp

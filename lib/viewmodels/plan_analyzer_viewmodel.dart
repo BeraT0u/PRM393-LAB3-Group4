@@ -147,6 +147,47 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
     Future.microtask(() => _syncStudentPassedCourses(uid));
 
+    // Lắng nghe realtime trạng thái duyệt kế hoạch & nghiệm thu điểm từ Web Admin
+    final sub = _planService.watchUserPlans(uid).listen((cloudPlans) {
+      if (state.plan.userId != uid || cloudPlans.isEmpty) return;
+
+      // Kiểm tra xem kế hoạch hiện tại vừa được Cố vấn duyệt nghiệm thu hoàn tất ('completed') chưa
+      final currentId = state.plan.id;
+      final completedMatch = cloudPlans.where(
+        (p) =>
+            (p.id == currentId || p.semesterName == state.plan.semesterName) &&
+            p.isFullyCompleted &&
+            (state.plan.isPendingAcceptance || state.plan.isSaved),
+      );
+      if (completedMatch.isNotEmpty) {
+        _planService.clearLocalDraftPlan(uid, semester: state.plan.semesterName);
+        ref.invalidate(completedCoursesViewModelProvider);
+        ref.invalidate(courseCatalogViewModelProvider);
+        _syncStudentPassedCourses(uid);
+        return;
+      }
+
+      // Tìm kế hoạch đang hoạt động (chưa completed) khớp với kỳ hiện tại
+      final activeCloud = cloudPlans.where((p) => !p.isFullyCompleted).toList();
+      if (activeCloud.isEmpty) return;
+
+      final match = activeCloud.firstWhere(
+        (p) => p.id == currentId || p.semesterName == state.plan.semesterName,
+        orElse: () => activeCloud.first,
+      );
+
+      // Cập nhật trạng thái duyệt (pending / approved / rejected / pending_acceptance / acceptance_rejected)
+      if (state.plan.isSaved || state.plan.selectedCourses.isEmpty) {
+        final synced = match.copyWith(
+          isSaved: true,
+          maxSafeThresholdHours: state.maxSafeThresholdHours,
+        );
+        _planService.saveLocalDraftPlan(synced);
+        state = state.copyWith(plan: synced);
+      }
+    });
+    ref.onDispose(sub.cancel);
+
     return initialState;
   }
 
@@ -182,23 +223,32 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
             .where((c) => !merged.contains(c.code))
             .toList();
 
-        final effectivePlan = state.plan.selectedCourses.isNotEmpty
-            ? state.plan.copyWith(
-                id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
-                semesterName: currentSemesterName,
-                selectedCourses: currentSelected,
-                targetGpa: profile.targetGpa > 0
-                    ? profile.targetGpa
-                    : state.plan.targetGpa,
-                tuitionFee: _calculateTuition(currentSelected),
-              )
-            : loadedPlan.copyWith(
+        final bool preferCloudLoaded = loadedSelected.isNotEmpty &&
+            (currentSelected.isEmpty ||
+                state.plan.isSaved ||
+                loadedPlan.status != 'draft');
+
+        final effectivePlan = preferCloudLoaded
+            ? loadedPlan.copyWith(
                 semesterName: currentSemesterName,
                 selectedCourses: loadedSelected,
+                studentName: profile.fullName,
+                studentCode: profile.studentId,
                 targetGpa: profile.targetGpa > 0
                     ? profile.targetGpa
                     : loadedPlan.targetGpa,
                 tuitionFee: _calculateTuition(loadedSelected),
+              )
+            : state.plan.copyWith(
+                id: '${uid}_${currentSemesterName.replaceAll(' ', '_')}',
+                semesterName: currentSemesterName,
+                selectedCourses: currentSelected,
+                studentName: profile.fullName,
+                studentCode: profile.studentId,
+                targetGpa: profile.targetGpa > 0
+                    ? profile.targetGpa
+                    : state.plan.targetGpa,
+                tuitionFee: _calculateTuition(currentSelected),
               );
         _planService.saveLocalDraftPlan(effectivePlan);
         state = state.copyWith(
@@ -281,6 +331,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       selectedCourses: currentCourses,
       tuitionFee: _calculateTuition(currentCourses),
       isSaved: false,
+      status: 'draft',
       updatedAt: DateTime.now(),
     );
 
@@ -357,6 +408,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       selectedCourses: updatedCourses,
       tuitionFee: _calculateTuition(updatedCourses),
       isSaved: false,
+      status: 'draft',
       updatedAt: DateTime.now(),
     );
 
@@ -390,6 +442,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     final updatedPlan = state.plan.copyWith(
       selectedCourses: updatedCourses,
       isSaved: false,
+      status: 'draft',
       updatedAt: DateTime.now(),
     );
 
@@ -405,6 +458,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       selectedCourses: updatedCourses,
       tuitionFee: _calculateTuition(updatedCourses),
       isSaved: false,
+      status: 'draft',
       updatedAt: DateTime.now(),
     );
     _planService.saveLocalDraftPlan(updatedPlan);
@@ -455,7 +509,7 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     }
   }
 
-  /// Lưu kế hoạch học tập hợp lệ lên Cloud Firestore (UC-25)
+  /// Lưu & Gửi duyệt kế hoạch học tập hợp lệ lên Cloud Firestore với status = 'pending' (UC-25)
   Future<bool> savePlan() async {
     if (state.courseCount == 0) {
       state = state.copyWith(
@@ -474,8 +528,18 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     state = state.copyWith(isSaving: true, errorMessage: null);
 
     try {
+      final uid = ref.read(currentStudentUidProvider);
+      final cachedProfile =
+          ref.read(completedCoursesViewModelProvider).value?.profile ??
+              ref.read(studentServiceProvider).getCachedProfile(uid) ??
+              DatabaseSeeder.getStudentByUid(uid);
+
       final planToSave = state.plan.copyWith(
+        studentName: cachedProfile.fullName,
+        studentCode: cachedProfile.studentId,
         isSaved: true,
+        status: 'pending',
+        isCompleted: false,
         updatedAt: DateTime.now(),
       );
 

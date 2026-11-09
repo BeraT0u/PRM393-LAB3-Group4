@@ -79,14 +79,51 @@ class PlanService {
     return empty;
   }
 
-  /// Tải kế hoạch học tập của sinh viên (ưu tiên Local Draft, sau đó kiểm tra Cloud Firestore)
+  /// Lắng nghe realtime các bản kế hoạch của sinh viên trên Cloud Firestore
+  /// Giúp Mobile tự động cập nhật ngay khi Cố vấn duyệt kế hoạch hoặc duyệt nghiệm thu điểm trên Web
+  Stream<List<StudyPlanModel>> watchUserPlans(String userId) {
+    final ref = _plansRef;
+    if (ref == null || userId.isEmpty) {
+      return const Stream.empty();
+    }
+    return ref.where('userId', isEqualTo: userId).snapshots().map((snap) {
+      return snap.docs
+          .map((d) => StudyPlanModel.fromMap(d.data(), d.id))
+          .toList();
+    });
+  }
+
+  /// Tải kế hoạch học tập của sinh viên (luôn đồng bộ trạng thái duyệt mới nhất từ Cloud Firestore)
   Future<StudyPlanModel> getStudyPlan({
     required String userId,
     String semester = 'Học kỳ 1',
     double maxSafeHours = 25.0,
   }) async {
     final local = _localDraftPlans[userId];
-    if (local != null && local.selectedCourses.isNotEmpty) {
+    final ref = _plansRef;
+
+    if (ref == null) {
+      if (local != null && local.selectedCourses.isNotEmpty) {
+        final updated = local.copyWith(
+          id: '${userId}_${semester.replaceAll(' ', '_')}',
+          semesterName: semester,
+          maxSafeThresholdHours: maxSafeHours,
+        );
+        _localDraftPlans[userId] = updated;
+        return updated;
+      }
+      return getLocalDraftPlan(
+        userId: userId,
+        semester: semester,
+        maxSafeHours: maxSafeHours,
+      );
+    }
+
+    // Nếu người dùng đang chọn môn nháp ở local (chưa bấm gửi duyệt), giữ bản nháp đang chỉnh sửa
+    if (local != null &&
+        local.selectedCourses.isNotEmpty &&
+        !local.isSaved &&
+        local.status == 'draft') {
       final updated = local.copyWith(
         id: '${userId}_${semester.replaceAll(' ', '_')}',
         semesterName: semester,
@@ -98,28 +135,24 @@ class PlanService {
 
     final docIdUnderscore = '${userId}_${semester.replaceAll(' ', '_')}';
     final docIdCompact = '${userId}_${semester.replaceAll(' ', '')}';
-    final ref = _plansRef;
-    if (ref == null) {
-      return getLocalDraftPlan(
-        userId: userId,
-        semester: semester,
-        maxSafeHours: maxSafeHours,
-      );
-    }
 
     try {
       for (final candidateId in [docIdUnderscore, docIdCompact]) {
         final doc = await ref.doc(candidateId).get();
         if (doc.exists && doc.data() != null) {
           final data = doc.data()!;
-          if (data['isCompleted'] != true) {
+          final isDone =
+              data['isCompleted'] == true || data['status'] == 'completed';
+          if (!isDone) {
             final cloudPlan = StudyPlanModel.fromMap(data, doc.id).copyWith(
-              id: docIdUnderscore,
-              semesterName: semester,
+              id: doc.id,
               isSaved: true,
             );
             _localDraftPlans[userId] = cloudPlan;
             return cloudPlan;
+          } else if (local != null && local.id == doc.id) {
+            // Kế hoạch vừa được Cố vấn duyệt nghiệm thu hoàn tất -> xóa cache cũ
+            _localDraftPlans.remove(userId);
           }
         }
       }
@@ -129,10 +162,11 @@ class PlanService {
           await ref.where('userId', isEqualTo: userId).get();
       for (final d in querySnap.docs) {
         final data = d.data();
-        if (data['isCompleted'] != true) {
+        final isDone =
+            data['isCompleted'] == true || data['status'] == 'completed';
+        if (!isDone) {
           final cloudPlan = StudyPlanModel.fromMap(data, d.id).copyWith(
-            id: docIdUnderscore,
-            semesterName: semester,
+            id: d.id,
             isSaved: true,
           );
           if (cloudPlan.selectedCourses.isNotEmpty) {
@@ -152,18 +186,28 @@ class PlanService {
     );
   }
 
-  /// Lưu chính thức kế hoạch học tập lên Cloud Firestore (chỉ gọi khi đã hết xung đột)
+  /// Lưu và gửi duyệt kế hoạch học tập lên Cloud Firestore (status = 'pending')
   Future<void> saveStudyPlan(StudyPlanModel plan) async {
-    _localDraftPlans[plan.userId] = plan;
+    final normalizedStatus =
+        (plan.status == 'draft' || plan.status == 'rejected')
+            ? 'pending'
+            : plan.status;
+    final planToSave = plan.copyWith(
+      isSaved: true,
+      status: normalizedStatus,
+    );
+    _localDraftPlans[planToSave.userId] = planToSave;
 
     final ref = _plansRef;
     if (ref == null) {
-      AppLogger.info('Chế độ Offline: Đã lưu StudyPlan cục bộ: ${plan.id}');
+      AppLogger.info('Chế độ Offline: Đã lưu StudyPlan cục bộ: ${planToSave.id}');
       return;
     }
     try {
-      await ref.doc(plan.id).set(plan.toMap(), SetOptions(merge: true));
-      AppLogger.info('Đã lưu kế hoạch ${plan.id} lên Cloud Firestore thành công!');
+      await ref.doc(planToSave.id).set(planToSave.toMap(), SetOptions(merge: true));
+      AppLogger.info(
+        'Đã gửi kế hoạch ${planToSave.id} (status=${planToSave.status}) lên Cloud Firestore thành công!',
+      );
     } catch (e, st) {
       AppLogger.error('Lỗi khi lưu StudyPlan lên Firestore', e, st);
     }

@@ -275,8 +275,8 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
     );
   });
 
-  // Students collection verification
-  it('Students: student can read & write own profile, staff/admin can read, other user denied', async () => {
+  // Students collection verification & Staff/Admin sync on acceptance
+  it('Students: student can read & write own profile, staff/admin can read & sync grades, other user denied', async () => {
     await systemDb.collection('users').doc('staff_1').set({
       uid: 'staff_1',
       role: 'staff',
@@ -313,12 +313,113 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
       staffDb.collection('students').doc('user_123').collection('completed_courses').doc('PRM392').get()
     );
 
-    // Another student cannot read
+    // Staff can sync approved grades into student's profile & completed_courses
+    await assertSucceeds(
+      staffDb.collection('students').doc('user_123').update({
+        accumulatedCredits: 30,
+        currentGpa: 3.65,
+        passedCourseCodes: ['PRM392', 'SWP391'],
+      })
+    );
+    await assertSucceeds(
+      staffDb.collection('students').doc('user_123').collection('completed_courses').doc('SWP391').set({
+        code: 'SWP391',
+        grade: 9.0,
+        isPassed: true,
+      })
+    );
+
+    // Another student cannot read or write
     await assertFails(
       otherUserDb.collection('students').doc('user_123').get()
     );
     await assertFails(
       otherUserDb.collection('students').doc('user_123').collection('completed_courses').doc('PRM392').get()
+    );
+    await assertFails(
+      otherUserDb.collection('students').doc('user_123').update({
+        currentGpa: 4.0,
+      })
+    );
+    await assertFails(
+      otherUserDb.collection('students').doc('user_123').collection('completed_courses').doc('PRM392').delete()
+    );
+  });
+
+  // Stage 2 Approval Tests:
+  it('Study Plans (Stage 2): user can create plan with pending_acceptance status', async () => {
+    await assertSucceeds(
+      userDb.collection('study_plans').doc('plan_stage2').set({
+        userId: 'user_123',
+        status: 'pending_acceptance',
+        semesterName: 'Fall 2026',
+        totalCredits: 12,
+      })
+    );
+  });
+
+  it('Study Plans (Stage 2): user can submit approved plan for acceptance, cannot self-complete', async () => {
+    await systemDb.collection('study_plans').doc('plan_approved').set({
+      userId: 'user_123',
+      status: 'approved',
+      semesterName: 'Fall 2026',
+    });
+
+    // Student submits for acceptance
+    await assertSucceeds(
+      userDb.collection('study_plans').doc('plan_approved').update({
+        status: 'pending_acceptance',
+      })
+    );
+
+    // Student cannot self-complete plan
+    await assertFails(
+      userDb.collection('study_plans').doc('plan_approved').update({
+        status: 'completed',
+      })
+    );
+  });
+
+  it('Study Plans (Stage 2): staff can complete or reject acceptance with reviewReason', async () => {
+    await systemDb.collection('users').doc('staff_1').set({
+      uid: 'staff_1',
+      role: 'staff',
+    });
+    await systemDb.collection('study_plans').doc('plan_pending_acc').set({
+      userId: 'user_123',
+      status: 'pending_acceptance',
+      semesterName: 'Fall 2026',
+    });
+
+    // Staff approves acceptance to completed with reviewReason
+    await assertSucceeds(
+      staffDb.collection('study_plans').doc('plan_pending_acc').update({
+        status: 'completed',
+        reviewReason: 'Điểm số hợp lệ, hoàn thành nghiệm thu kỳ học',
+        reviewedBy: 'advisor@fpt.edu.vn',
+      })
+    );
+
+    // Reset status to pending_acceptance
+    await systemDb.collection('study_plans').doc('plan_pending_acc').update({
+      status: 'pending_acceptance',
+    });
+
+    // Staff rejects acceptance with reviewReason
+    await assertSucceeds(
+      staffDb.collection('study_plans').doc('plan_pending_acc').update({
+        status: 'acceptance_rejected',
+        reviewReason: 'Bảng điểm chưa có chữ ký xác nhận của phòng đào tạo',
+        reviewedBy: 'advisor@fpt.edu.vn',
+      })
+    );
+
+    // Staff update fails without valid reviewReason
+    await assertFails(
+      staffDb.collection('study_plans').doc('plan_pending_acc').update({
+        status: 'completed',
+        reviewReason: 'ok', // < 3 characters
+      })
     );
   });
 });

@@ -63,22 +63,25 @@ class SemesterSummaryScreen extends ConsumerWidget {
       if (!context.mounted) return;
 
       if (success) {
+        final updatedState = ref.read(semesterSummaryViewModelProvider);
         final passedCount = results.where((r) => r.isPassed && r.grade >= 4.0).length;
         final addedCredits = results
             .where((r) => r.isPassed && r.grade >= 4.0)
             .fold<int>(0, (sum, r) => sum + r.course.credits);
 
+        final snackText = updatedState.plan.isPendingAcceptance
+            ? '📨 Đã gửi bảng điểm nghiệm thu ($passedCount/${results.length} môn đạt) lên Web Admin chờ Cố vấn duyệt!'
+            : '🎉 Nghiệm thu hoàn tất! Đạt $passedCount/${results.length} môn (+$addedCredits TC).';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              '🎉 Nghiệm thu hoàn tất! Đạt $passedCount/${results.length} môn (+$addedCredits TC).',
-            ),
+            content: Text(snackText),
             backgroundColor: AppColors.successBorder,
             duration: const Duration(seconds: 3),
           ),
         );
 
-        // Điều hướng sang SCR-03 Completed Courses để thấy thành quả (UC-26B)
+        // Điều hướng sang SCR-03 Completed Courses để thấy trạng thái chờ duyệt / thành quả (UC-26B)
         Navigator.of(context).pushNamedAndRemoveUntil(
           '/completed-courses',
           ModalRoute.withName('/home'),
@@ -87,10 +90,52 @@ class SemesterSummaryScreen extends ConsumerWidget {
     }
   }
 
+  Widget? _buildReviewStatusBanner(SemesterSummaryState state) {
+    final plan = state.plan;
+    if (plan.isPending) {
+      return const AppAlertBanner(
+        variant: AlertBannerVariant.warning,
+        message:
+            '⏳ Kế hoạch học tập đã được gửi và đang chờ Cố vấn học tập phê duyệt trên cổng Web Admin.',
+      );
+    }
+    if (plan.isRejected) {
+      return AppAlertBanner(
+        variant: AlertBannerVariant.danger,
+        message:
+            '❌ Cố vấn yêu cầu chỉnh sửa kế hoạch: ${plan.reviewReason ?? "Vui lòng điều chỉnh lại danh sách môn học và gửi duyệt lại."}',
+      );
+    }
+    if (plan.isPendingAcceptance) {
+      return const AppAlertBanner(
+        variant: AlertBannerVariant.warning,
+        message:
+            '⏳ Đã gửi bảng điểm nghiệm thu kỳ học! Vui lòng chờ Cố vấn xác nhận trên cổng Web Admin để cộng tín chỉ vào hồ sơ.',
+      );
+    }
+    if (plan.isAcceptanceRejected) {
+      return AppAlertBanner(
+        variant: AlertBannerVariant.danger,
+        message:
+            '❌ Cố vấn yêu cầu kiểm tra lại điểm nghiệm thu: ${plan.reviewReason ?? "Vui lòng nhập lại điểm chính xác."}',
+      );
+    }
+    if (plan.isApproved &&
+        plan.reviewReason != null &&
+        plan.reviewReason!.trim().isNotEmpty) {
+      return AppAlertBanner(
+        variant: AlertBannerVariant.success,
+        message: '✅ Cố vấn đã phê duyệt kế hoạch: "${plan.reviewReason}"',
+      );
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(semesterSummaryViewModelProvider);
     final theme = Theme.of(context);
+    final statusBanner = _buildReviewStatusBanner(state);
 
     return MainScaffold(
       // UC-26: Khôi phục thanh Bottom Navigation Bar 4 tab
@@ -109,6 +154,11 @@ class SemesterSummaryScreen extends ConsumerWidget {
           AppSpacing.bottomClearanceWithBar,
         ),
         children: [
+          if (statusBanner != null) ...[
+            statusBanner,
+            const SizedBox(height: AppSpacing.md),
+          ],
+
           // UC-26: Thẻ Hero KPI
           _HeroKpiCard(state: state),
           const SizedBox(height: AppSpacing.xl),
@@ -145,6 +195,38 @@ class _HeroKpiCard extends StatelessWidget {
   final SemesterSummaryState state;
 
   const _HeroKpiCard({required this.state});
+
+  StatusBadge _buildPlanBadge(SemesterSummaryState state) {
+    final plan = state.plan;
+    if (plan.isPending) {
+      return const StatusBadge(
+        label: 'Chờ cố vấn duyệt ⏳',
+        type: StatusBadgeType.warning,
+      );
+    }
+    if (plan.isRejected) {
+      return const StatusBadge(
+        label: 'Yêu cầu sửa ❌',
+        type: StatusBadgeType.danger,
+      );
+    }
+    if (plan.isPendingAcceptance) {
+      return const StatusBadge(
+        label: 'Chờ duyệt điểm ⏳',
+        type: StatusBadgeType.warning,
+      );
+    }
+    if (plan.isAcceptanceRejected) {
+      return const StatusBadge(
+        label: 'Sửa điểm nghiệm thu ❌',
+        type: StatusBadgeType.danger,
+      );
+    }
+    return const StatusBadge(
+      label: 'Lộ trình hợp lệ ✅',
+      type: StatusBadgeType.success,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -187,10 +269,7 @@ class _HeroKpiCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              const StatusBadge(
-                label: 'Lộ trình hợp lệ ✅',
-                type: StatusBadgeType.success,
-              ),
+              _buildPlanBadge(state),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -608,6 +687,47 @@ class _CompleteSemesterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final plan = state.plan;
+    final bool canSubmitAcceptance =
+        (plan.isApproved || plan.isAcceptanceRejected) &&
+            !state.isCompleted &&
+            !state.isCompletingSemester &&
+            state.courseCount > 0;
+
+    String descriptionText;
+    String buttonLabel;
+    IconData buttonIcon = Icons.task_alt_rounded;
+
+    if (state.isCompletingSemester) {
+      descriptionText = 'Đang gửi bảng điểm nghiệm thu học kỳ lên hệ thống...';
+      buttonLabel = 'Đang gửi nghiệm thu...';
+    } else if (state.isCompleted || plan.isFullyCompleted) {
+      descriptionText =
+          'Học kỳ này đã được nghiệm thu! Toàn bộ ${state.courseCount} môn học đã được chuyển vào danh mục Môn Đã Học (SCR-03) và số tín chỉ đã được tích lũy vào hồ sơ.';
+      buttonLabel = 'Kỳ học đã hoàn thành';
+      buttonIcon = Icons.done_all_rounded;
+    } else if (plan.isPendingAcceptance) {
+      descriptionText =
+          'Bảng điểm của ${state.courseCount} môn học đã được gửi lên cổng Web Admin. Số tín chỉ (${state.totalCredits} TC) và GPA sẽ tự động cập nhật vào hồ sơ ngay khi Cố vấn học tập xác nhận nghiệm thu.';
+      buttonLabel = '⏳ Đang Chờ Cố Vấn Duyệt Điểm';
+      buttonIcon = Icons.hourglass_top_rounded;
+    } else if (plan.isPending || plan.isDraft) {
+      descriptionText =
+          'Kế hoạch học tập ${plan.semesterName} đang chờ Cố vấn học tập phê duyệt trên cổng Web Admin. Bạn chỉ có thể nộp bảng điểm nghiệm thu sau khi kế hoạch được duyệt.';
+      buttonLabel = '🔒 Chờ Cố Vấn Duyệt Kế Hoạch';
+      buttonIcon = Icons.lock_clock_rounded;
+    } else if (plan.isRejected) {
+      descriptionText =
+          'Kế hoạch học tập này đã bị Cố vấn yêu cầu chỉnh sửa. Vui lòng quay lại điều chỉnh danh sách môn học và gửi duyệt lại trước khi nghiệm thu.';
+      buttonLabel = '❌ Kế Hoạch Cần Chỉnh Sửa';
+      buttonIcon = Icons.error_outline_rounded;
+    } else {
+      descriptionText =
+          'Đã hoàn tất học kỳ ${plan.semesterName}? Nhấn nút bên dưới để nhập điểm số và gửi yêu cầu nghiệm thu ${state.courseCount} môn (${state.totalCredits} TC) lên Cố vấn học tập.';
+      buttonLabel = '✅ Đã Hoàn Thành Kỳ Học';
+      buttonIcon = Icons.task_alt_rounded;
+    }
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -615,7 +735,9 @@ class _CompleteSemesterCard extends StatelessWidget {
         color: AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(
-          color: state.isCompleted ? AppColors.successBorder : AppColors.borderStructural,
+          color: (state.isCompleted || plan.isFullyCompleted)
+              ? AppColors.successBorder
+              : AppColors.borderStructural,
         ),
         boxShadow: AppElevation.softShadow,
       ),
@@ -625,8 +747,12 @@ class _CompleteSemesterCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                state.isCompleted ? Icons.check_circle_rounded : Icons.verified_outlined,
-                color: state.isCompleted ? AppColors.successBorder : AppColors.primaryBlue,
+                (state.isCompleted || plan.isFullyCompleted)
+                    ? Icons.check_circle_rounded
+                    : Icons.verified_outlined,
+                color: (state.isCompleted || plan.isFullyCompleted)
+                    ? AppColors.successBorder
+                    : AppColors.primaryBlue,
                 size: 24,
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -640,9 +766,7 @@ class _CompleteSemesterCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            state.isCompleted
-                ? 'Học kỳ này đã được nghiệm thu! Toàn bộ ${state.courseCount} môn học đã được chuyển vào danh mục Môn Đã Học (SCR-03) và số tín chỉ đã được tích lũy vào hồ sơ.'
-                : 'Đã hoàn tất học kỳ ${state.plan.semesterName}? Nhấn nút bên dưới để tự động chuyển toàn bộ ${state.courseCount} môn sang danh mục "Môn Đã Học" (SCR-03) và tích lũy thêm ${state.totalCredits} tín chỉ vào tiến độ tốt nghiệp.',
+            descriptionText,
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
               height: 1.4,
@@ -656,8 +780,11 @@ class _CompleteSemesterCard extends StatelessWidget {
             height: 52,
             child: FilledButton.icon(
               style: FilledButton.styleFrom(
-                backgroundColor: state.isCompleted ? AppColors.borderStructural : const Color(0xFF16A34A),
-                foregroundColor: state.isCompleted ? AppColors.textSecondary : Colors.white,
+                backgroundColor: canSubmitAcceptance
+                    ? const Color(0xFF16A34A)
+                    : AppColors.borderStructural,
+                foregroundColor:
+                    canSubmitAcceptance ? Colors.white : AppColors.textSecondary,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(AppRadius.control),
                 ),
@@ -667,18 +794,20 @@ class _CompleteSemesterCard extends StatelessWidget {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
-                  : Icon(state.isCompleted ? Icons.done_all_rounded : Icons.task_alt_rounded),
+                  : Icon(buttonIcon),
               label: Text(
-                state.isCompletingSemester
-                    ? 'Đang nghiệm thu kỳ học...'
-                    : (state.isCompleted ? 'Kỳ học đã hoàn thành' : '✅ Đã Hoàn Thành Kỳ Học'),
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                buttonLabel,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-              onPressed: (state.isCompleted || state.isCompletingSemester || state.courseCount == 0)
-                  ? null
-                  : onComplete,
+              onPressed: canSubmitAcceptance ? onComplete : null,
             ),
           ),
         ],

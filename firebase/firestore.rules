@@ -73,7 +73,7 @@ rules_version = '2';
 //   - maxSafeThresholdHours: number (optional) - Safe threshold limit
 //   - targetGpa: number (optional) - Target GPA
 //   - tuitionFee: int (optional) - Tuition fee
-//   - status: string (required, 'draft' | 'pending' | 'approved' | 'rejected' | 'completed')
+//   - status: string (required, 'draft' | 'pending' | 'approved' | 'rejected' | 'pending_acceptance' | 'completed' | 'acceptance_rejected')
 //   - reviewReason: string (optional, size >= 3 when reviewed by staff/admin)
 //   - reviewedBy: string (optional) - Reviewer identifier / email
 //   - reviewedAt: timestamp (optional) - Review timestamp
@@ -150,13 +150,13 @@ service cloud.firestore {
       // Owner student or staff/admin can read student profiles
       allow read: if isOwner(uid) || isStaffOrAdmin();
 
-      // Only the owner student can create, update, or delete their profile
-      allow create, update, delete: if isOwner(uid);
+      // Owner student or staff/admin can create, update, or delete profile (allows grade acceptance sync by staff/admin)
+      allow create, update, delete: if isOwner(uid) || isStaffOrAdmin();
 
       // Subcollection: completed_courses/{docId}
       match /completed_courses/{docId} {
         allow read: if isOwner(uid) || isStaffOrAdmin();
-        allow create, update, delete: if isOwner(uid);
+        allow create, update, delete: if isOwner(uid) || isStaffOrAdmin();
       }
     }
 
@@ -189,23 +189,30 @@ service cloud.firestore {
         request.auth.uid == resource.data.userId || isStaffOrAdmin()
       );
 
-      // Owner student can create plans in 'draft' or 'pending' status
+      // Owner student can create plans in 'draft', 'pending', or 'pending_acceptance' status
       allow create: if isSignedIn() &&
         request.auth.uid == request.resource.data.userId &&
-        request.resource.data.status in ['draft', 'pending'];
+        request.resource.data.status in ['draft', 'pending', 'pending_acceptance'];
 
       // Updates:
-      // 1. User: can update own plan when status is draft, pending, or rejected; cannot self-approve
-      // 2. Staff/Admin: can review pending plan to approved/rejected with reviewReason (>= 3 chars)
+      // a) Owner student:
+      //    - Can update plan when status in ['draft', 'pending', 'rejected'] and new status in ['draft', 'pending'] (cannot self-approve)
+      //    - Can submit grades for acceptance/update PDF when status in ['approved', 'pending_acceptance', 'acceptance_rejected'] and new status in ['approved', 'pending_acceptance'] (cannot self-complete)
+      // b) Staff/Admin:
+      //    - Can review a plan or acceptance request as long as new status in ['approved', 'rejected', 'completed', 'acceptance_rejected'] with reviewReason (>= 3 chars)
       allow update: if (
         (isSignedIn() &&
          request.auth.uid == resource.data.userId &&
          (!('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId) &&
-         resource.data.status in ['draft', 'pending', 'rejected'] &&
-         request.resource.data.status != 'approved') ||
+         (
+           (resource.data.status in ['draft', 'pending', 'rejected'] &&
+            request.resource.data.status in ['draft', 'pending']) ||
+           (resource.data.status in ['approved', 'pending_acceptance', 'acceptance_rejected'] &&
+            request.resource.data.status in ['approved', 'pending_acceptance'])
+         )
+        ) ||
         (isStaffOrAdmin() &&
-         resource.data.status == 'pending' &&
-         request.resource.data.status in ['approved', 'rejected'] &&
+         request.resource.data.status in ['approved', 'rejected', 'completed', 'acceptance_rejected'] &&
          request.resource.data.reviewReason is string &&
          request.resource.data.reviewReason.size() >= 3)
       );

@@ -158,3 +158,38 @@ PRM393_Lab3/
 * **Demo Video Link**: *(Sẽ cập nhật đường link YouTube/Drive tại đây)*
 * **Slide Presentation**: Nằm trong thư mục `slides/Lab03_SE180504_slides.pdf`
 * **Final Report**: Nằm trong thư mục `report/Lab03_SE180504.pdf`
+
+
+## 📋 6. Bảng liên kết tài liệu chuyển giao (Deliverables Matrix)
+
+| Giai đoạn (Stage) | Tài liệu chuyển giao | Mô tả nội dung & Quy chuẩn đề cương | Trạng thái |
+|:---|:---|:---|:---:|
+| **Stage 1: Traceability** | [docs/design-traceability.md](file:///H:/Study/2026_fall/PRM392/Lab3/docs/design-traceability.md) | Ánh xạ toàn bộ 9 màn hình và 3 flows từ Figma sang Flutter | ✅ Hoàn thành |
+| **Stage 2: Architecture** | [docs/architecture.md](file:///H:/Study/2026_fall/PRM392/Lab3/docs/architecture.md) | Kiến trúc MVVM, Riverpod DI, Mermaid Sequence diagrams | ✅ Hoàn thành |
+| **Stage 5: Instrumentation** | [docs/analytics-plan.md](file:///H:/Study/2026_fall/PRM392/Lab3/docs/analytics-plan.md) | Kế hoạch 8 sự kiện Firebase Analytics & cam kết Zero-PII | ✅ Hoàn thành |
+| **Stage 6: Test Plan & E2E** | [docs/test-plan.md](file:///H:/Study/2026_fall/PRM392/Lab3/docs/test-plan.md) | 12 ca kiểm thử E2E (Happy, Error, Native) & ARTEMIS pass rate | ✅ Hoàn thành |
+| **Stage 7: AI Code Review** | [docs/code-review.md](file:///H:/Study/2026_fall/PRM392/Lab3/docs/code-review.md) | Báo cáo đánh giá mã nguồn AI (8 findings, 6 accepted, 1 rejected) | ✅ Hoàn thành |
+| **Hệ thống Web Admin** | [Resource/EduPlan-system-spec.md](file:///H:/Study/2026_fall/PRM392/Lab3/Resource/EduPlan-system-spec.md) | Đặc tả hệ thống đồng bộ Mobile & Web Admin Portal | ✅ Hoàn thành |
+| **Slide tiếng Việt** | [Resource/EduPlan-Presentation.pptx](file:///H:/Study/2026_fall/PRM392/Lab3/Resource/EduPlan-Presentation.pptx) | Slide thuyết trình 25 trang chuẩn 16:9 (Tiếng Việt) | ✅ Hoàn thành |
+| **Slide tiếng Anh** | [Resource/EduPlan-Presentation-EN.pptx](file:///H:/Study/2026_fall/PRM392/Lab3/Resource/EduPlan-Presentation-EN.pptx) | Slide thuyết trình 25 trang chuẩn 16:9 (Tiếng Anh) | ✅ Hoàn thành |
+
+---
+
+## 🤖 7. Danh mục công cụ AI sử dụng (AI Tools Disclosure)
+
+Tuân thủ quy định tại **Section 8.5 & 11 (Academic Integrity)** của Đề cương Lab 3:
+
+| Tên công cụ | Đơn vị & Phiên bản | Mục đích & Phạm vi sử dụng |
+|:---|:---|:---|
+| **Google Gemini API** | Google DeepMind (`gemini-3.8-flash` / `gemini-2.5-flash`) | Cố vấn học tập thông minh (AI Study Advisor) & tối ưu hóa tải học kỳ. |
+| **DeepSeek API** | DeepSeek (`deepseek-chat` DeepSeek V3) | Cơ chế AI Fallback tự động khi Gemini API hết quota hoặc sự cố mạng. |
+| **CodeRabbit AI** | CodeRabbit v2.4 (PR Reviewer) | Rà soát tự động Pull Request, phát hiện rò rỉ secret key và Zero-PII. |
+| **GitHub Copilot** | Microsoft / GitHub | Gợi ý cú pháp mã nguồn và sinh dữ liệu kiểm thử test fixtures. |
+| **Antigravity Agent** | Google DeepMind | Phân tích mã nguồn, kiểm tra lint, chuẩn hóa tài liệu và sinh slide thuyết trình. |
+
+---
+
+## 🎥 8. Video Demo & Báo cáo cuối kỳ
+* **Demo Video Link**: *(Cập nhật đường link YouTube/Google Drive khi nộp)*
+* **Slide Presentation**: Nằm trong thư mục `slides/Lab03_SE180504_slides.pdf` và `Resource/EduPlan-Presentation.pptx`
+* **Final Report**: Nằm trong thư mục `report/Lab03_SE180504.pdf`

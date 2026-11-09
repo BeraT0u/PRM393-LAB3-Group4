@@ -205,12 +205,7 @@ class StudentService {
 
         // Với tài khoản đăng nhập thực tế (không phải seed mẫu), đồng bộ từ completed_courses
         if (uid != DatabaseSeeder.defaultStudent.uid) {
-          final completedSnap =
-              await ref.doc(uid).collection('completed_courses').get();
-          final realCompleted = completedSnap.docs
-              .map((d) => CompletedCourseModel.fromMap(d.data(), d.id))
-              .toList();
-          _localCompletedCourses[uid] = realCompleted;
+          final realCompleted = await getCompletedCourses(uid);
 
           final uniquePassed = <String, CompletedCourseModel>{};
           for (final c in realCompleted) {
@@ -443,7 +438,44 @@ class StudentService {
     return updated;
   }
 
-  /// Lấy danh sách môn đã học của sinh viên (SCR-03)
+  /// Lấy danh sách các môn học đang chờ Cố vấn duyệt nghiệm thu điểm trên cổng Web
+  Future<List<CompletedCourseModel>> getPendingAcceptanceCourses(String uid) async {
+    final firestore = _firestore;
+    if (firestore == null || uid.isEmpty) return const [];
+    try {
+      final snap = await firestore
+          .collection('study_plans')
+          .where('userId', isEqualTo: uid)
+          .get();
+      final pendingList = <CompletedCourseModel>[];
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final status = data['status'] as String? ?? '';
+        if (status == 'pending_acceptance' || status == 'acceptance_rejected') {
+          final semesterName = data['semesterName'] as String?;
+          final grades = (data['submittedGrades'] as List<dynamic>?) ?? const [];
+          for (final g in grades) {
+            if (g is Map) {
+              final map = Map<String, dynamic>.from(g);
+              map['semesterName'] ??= semesterName;
+              pendingList.add(
+                CompletedCourseModel.fromMap(
+                  map,
+                  (map['code'] as String?) ?? doc.id,
+                ),
+              );
+            }
+          }
+        }
+      }
+      return pendingList;
+    } catch (e) {
+      AppLogger.warning('Lỗi khi tải danh sách môn chờ duyệt nghiệm thu: $e');
+      return const [];
+    }
+  }
+
+  /// Lấy danh sách môn đã học chính thức (đã được Cố vấn duyệt nghiệm thu) của sinh viên (SCR-03)
   Future<List<CompletedCourseModel>> getCompletedCourses(String uid) async {
     final ref = _studentsRef;
     if (ref == null) {
@@ -477,12 +509,39 @@ class StudentService {
         }
       }
 
-      // Hợp nhất với dữ liệu local nếu có môn vừa thêm
-      final localList = _localCompletedCourses[uid] ?? const [];
+      // Chỉ sử dụng danh sách môn đã được duyệt chính thức trên Firestore
       final mergedMap = <String, CompletedCourseModel>{
         for (final c in remoteList) '${c.semesterIndex ?? 0}_${c.code}': c,
-        for (final c in localList) '${c.semesterIndex ?? 0}_${c.code}': c,
       };
+
+      // Đồng bộ bổ sung từ các study_plans đã có status == 'completed' (nếu có)
+      final firestore = _firestore;
+      if (firestore != null) {
+        final completedPlansSnap = await firestore
+            .collection('study_plans')
+            .where('userId', isEqualTo: uid)
+            .get();
+        for (final pDoc in completedPlansSnap.docs) {
+          final pData = pDoc.data();
+          if (pData['status'] == 'completed' || pData['isCompleted'] == true) {
+            final submitted =
+                (pData['submittedGrades'] as List<dynamic>?) ?? const [];
+            for (final item in submitted) {
+              if (item is Map) {
+                final m = Map<String, dynamic>.from(item);
+                m['semesterName'] ??= pData['semesterName'];
+                final cModel = CompletedCourseModel.fromMap(
+                  m,
+                  (m['code'] as String?) ?? '',
+                );
+                final key = '${cModel.semesterIndex ?? 0}_${cModel.code}';
+                mergedMap.putIfAbsent(key, () => cModel);
+              }
+            }
+          }
+        }
+      }
+
       final merged = mergedMap.values.toList();
       _localCompletedCourses[uid] = merged;
       return merged;
@@ -495,6 +554,8 @@ class StudentService {
   }
 
   /// Khai báo thêm môn đã học theo kỳ (SCR-03)
+  /// - Khi kết nối Cloud Firestore: Gửi yêu cầu nghiệm thu điểm (status = 'pending_acceptance') lên Web Admin để Cố vấn duyệt trước khi cộng tín chỉ.
+  /// - Khi chạy Offline Unit Test (_firestore == null): Lưu vào bộ nhớ cục bộ để phục vụ kiểm thử.
   Future<void> addCompletedCourse({
     required String uid,
     required int semesterIndex, // 1..9
@@ -503,10 +564,13 @@ class StudentService {
   }) async {
     final profile = _localProfiles[uid] ?? await getStudentProfile(uid);
     final existingCompleted = await getCompletedCourses(uid);
+    final pendingAcceptance = await getPendingAcceptanceCourses(uid);
+    final combinedForValidation = [...existingCompleted, ...pendingAcceptance];
 
     // 1. Kiểm tra ràng buộc tiến trình kỳ học ("kì 2 phải có kì 1")
     for (var k = 1; k < semesterIndex; k++) {
-      final hasSemesterK = existingCompleted.any((c) => c.semesterIndex == k);
+      final hasSemesterK =
+          combinedForValidation.any((c) => c.semesterIndex == k);
       if (!hasSemesterK) {
         throw ArgumentError(
           'Không thể thêm môn vào Kỳ $semesterIndex khi Kỳ $k chưa có môn học nào hoàn thành. Vui lòng khai báo Kỳ $k trước!',
@@ -520,7 +584,7 @@ class StudentService {
       final reqCode = course.prerequisiteCode!.trim();
       final hasPrereqInPrevSemesters =
           profile.passedCourseCodes.contains(reqCode) ||
-              existingCompleted.any(
+              combinedForValidation.any(
                 (c) =>
                     c.code == reqCode &&
                     c.isActuallyPassed &&
@@ -535,17 +599,99 @@ class StudentService {
     }
 
     final isPassed = grade >= 4.0;
+    final gradeLetter = GpaCalculator.grade10ToLetter(grade);
+
+    // 3. Nếu có kết nối Cloud Firestore: Gửi lên study_plans với status = 'pending_acceptance' chờ Cố vấn duyệt trên Web
+    final firestore = _firestore;
+    if (firestore != null) {
+      final semesterName = 'Học kỳ $semesterIndex';
+      final planId = '${uid}_Hoc_ky_$semesterIndex';
+      final planRef = firestore.collection('study_plans').doc(planId);
+      final existingSnap = await planRef.get();
+
+      final existingCourses = <Map<String, dynamic>>[];
+      final existingGrades = <Map<String, dynamic>>[];
+
+      if (existingSnap.exists && existingSnap.data() != null) {
+        final data = existingSnap.data()!;
+        // Chỉ gộp nếu bản ghi đó đang chờ duyệt nghiệm thu hoặc bị từ chối nghiệm thu
+        if (data['status'] != 'completed') {
+          final rawCourses = (data['courses'] as List<dynamic>?) ?? const [];
+          for (final c in rawCourses) {
+            if (c is Map && c['code'] != course.code) {
+              existingCourses.add(Map<String, dynamic>.from(c));
+            }
+          }
+          final rawGrades =
+              (data['submittedGrades'] as List<dynamic>?) ?? const [];
+          for (final g in rawGrades) {
+            if (g is Map && g['code'] != course.code) {
+              existingGrades.add(Map<String, dynamic>.from(g));
+            }
+          }
+        }
+      }
+
+      existingCourses.add(course.toMap());
+      existingGrades.add({
+        'courseId': course.id,
+        'code': course.code,
+        'name': course.name,
+        'credits': course.credits,
+        'grade': grade,
+        'gradeLetter': gradeLetter,
+        'isPassed': isPassed,
+        'semesterIndex': semesterIndex,
+        'semesterName': semesterName,
+      });
+
+      final totalCredits = existingCourses.fold<int>(
+        0,
+        (acc, c) => acc + ((c['credits'] as num?)?.toInt() ?? 3),
+      );
+      final totalHours = existingCourses.fold<double>(
+        0.0,
+        (acc, c) =>
+            acc + ((c['plannedSelfStudyHours'] as num?)?.toDouble() ?? 6.0),
+      );
+
+      await planRef.set({
+        'id': planId,
+        'userId': uid,
+        'studentName': profile.fullName,
+        'studentCode': profile.studentId,
+        'semesterName': semesterName,
+        'courses': existingCourses,
+        'submittedGrades': existingGrades,
+        'totalCredits': totalCredits,
+        'totalSelfStudyHours': totalHours,
+        'maxSafeThresholdHours': 25.0,
+        'targetGpa': profile.targetGpa > 0 ? profile.targetGpa : 3.65,
+        'tuitionFee': totalCredits * 950000,
+        'isSaved': true,
+        'isCompleted': false,
+        'status': 'pending_acceptance',
+        'reviewReason': null,
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
+
+      AppLogger.info(
+        'Đã gửi môn ${course.code} (Kỳ $semesterIndex, điểm $grade) lên hàng đợi chờ Cố vấn duyệt nghiệm thu trên Web!',
+      );
+      return;
+    }
+
+    // 4. Chế độ Offline / Unit Test (_firestore == null): Cập nhật local phục vụ test
     final newCompletedCourse = CompletedCourseModel(
       code: course.code,
       name: course.name,
       credits: course.credits,
       semesterIndex: semesterIndex,
       grade: grade,
-      gradeLetter: GpaCalculator.grade10ToLetter(grade),
+      gradeLetter: gradeLetter,
       isPassed: isPassed,
     );
 
-    // Cập nhật bộ nhớ đệm local ngay lập tức: thay thế nếu cùng kỳ, giữ nguyên nếu khác kỳ
     final updatedCompletedList = [
       ...existingCompleted.where(
         (c) => !(c.code == course.code && c.semesterIndex == semesterIndex),
@@ -564,61 +710,21 @@ class StudentService {
     final updatedPassedCodes = uniquePassed.keys.toList();
     final updatedCredits = uniquePassed.values
         .fold<int>(0, (int total, c) => total + c.credits);
-
     final updatedGpa = GpaCalculator.calculateGpa(updatedCompletedList);
 
     final latestProfile = _localProfiles[uid] ?? profile;
-    final updatedProfile = latestProfile.copyWith(
+    _localProfiles[uid] = latestProfile.copyWith(
       passedCourseCodes: updatedPassedCodes,
       accumulatedCredits: updatedCredits,
       currentGpa: updatedGpa,
       isNewStudent: false,
     );
-    _localProfiles[uid] = updatedProfile;
-
-    // 3. Ghi lên Cloud Firestore nếu có kết nối
-    final ref = _studentsRef;
-    if (ref != null) {
-      try {
-        final docKey = '${semesterIndex}_${course.code}';
-        final courseDoc = ref
-            .doc(uid)
-            .collection('completed_courses')
-            .doc(docKey);
-
-        final courseData = {
-          'courseId': course.id,
-          'code': course.code,
-          'name': course.name,
-          'credits': course.credits,
-          'grade': grade,
-          'gradeLetter': GpaCalculator.grade10ToLetter(grade),
-          'isPassed': isPassed,
-          'semesterIndex': semesterIndex,
-          'completedAt': FieldValue.serverTimestamp(),
-        };
-
-        await courseDoc.set(courseData);
-        await ref.doc(uid).set({
-          'passedCourseCodes': updatedPassedCodes,
-          'accumulatedCredits': updatedCredits,
-          'currentGpa': updatedGpa,
-          'isNewStudent': false,
-        }, SetOptions(merge: true));
-      } catch (e) {
-        AppLogger.warning(
-          'Đã lưu môn học vào bộ nhớ máy (chờ đồng bộ Cloud): $e',
-        );
-      }
-    }
-
-    AppLogger.info(
-      'Đã thêm môn ${course.code} vào Kỳ $semesterIndex cho $uid (+${course.credits} TC, GPA=$updatedGpa)',
-    );
   }
 
-  /// Nghiệm thu kỳ học từ bản kế hoạch (SCR-07: Nút "✅ Đã Hoàn Thành Kỳ Học")
-  /// Tự động lưu tất cả các môn đã chọn kèm điểm số và trạng thái Đạt/Rớt do người dùng chọn.
+  /// Gửi yêu cầu nghiệm thu kỳ học từ bản kế hoạch đã được duyệt (SCR-07)
+  /// - Khi kết nối Cloud Firestore: KHÔNG tự động ghi vào completed_courses hay cộng tín chỉ ngay,
+  ///   mà lưu bảng điểm sinh viên kê khai vào study_plans với status = 'pending_acceptance' để Cố vấn trên Web duyệt.
+  /// - Khi chạy Offline Unit Test (_firestore == null): Cập nhật local phục vụ kiểm thử.
   Future<int> completeSemesterFromPlan({
     required String uid,
     required StudyPlanModel plan,
@@ -629,8 +735,6 @@ class StudentService {
     final profile = _localProfiles[uid] ?? await getStudentProfile(uid);
     final existingCompleted = await getCompletedCourses(uid);
 
-    // Xác định kỳ học tiếp theo: ưu tiên index từ plan.semesterName (ví dụ "Học kỳ 2" -> 2)
-    // Nếu plan.semesterName không chứa số kỳ, lấy kỳ cao nhất hiện có + 1.
     int? plannedSemesterIndex;
     final match = RegExp(
       r'(?:Học kỳ|Kỳ)\s*(\d+)',
@@ -644,18 +748,12 @@ class StudentService {
         .fold<int>(0, (prev, elem) => elem > prev ? elem : prev);
     final targetSemester = plannedSemesterIndex ?? (maxExistingSemester + 1);
 
-    final updatedCompletedMap = <String, CompletedCourseModel>{
-      for (final c in existingCompleted)
-        '${c.semesterIndex ?? 0}_${c.code}': c,
-    };
-    final newPassedCodes = Set<String>.from(profile.passedCourseCodes);
-    int addedCredits = 0;
-
     final Map<String, CourseGradeItem> gradeMap = {
       if (courseGrades != null)
         for (final item in courseGrades) item.course.code: item,
     };
 
+    final submittedGrades = <Map<String, dynamic>>[];
     for (final course in plan.selectedCourses) {
       final gradeItem = gradeMap[course.code];
       final bool isPassed = gradeItem?.isPassed ?? true;
@@ -664,27 +762,78 @@ class StudentService {
           : (course.selectedGradeTarget == 'B' ? 7.5 : 6.0);
       final double grade = gradeItem?.grade ?? defaultGrade;
       final String gradeLetter = GpaCalculator.grade10ToLetter(grade);
+      final bool isActuallyPassed = isPassed && grade >= 4.0;
 
-      final isActuallyPassed = isPassed && grade >= 4.0;
-      final isAlreadyPassed = newPassedCodes.contains(course.code);
+      submittedGrades.add({
+        'courseId': course.id,
+        'code': course.code,
+        'name': course.name,
+        'credits': course.credits,
+        'grade': grade,
+        'gradeLetter': gradeLetter,
+        'isPassed': isActuallyPassed,
+        'semesterIndex': targetSemester,
+        'semesterName': plan.semesterName,
+      });
+    }
 
-      final docKey = '${targetSemester}_${course.code}';
+    // Khi có kết nối Cloud Firestore: Gửi bảng điểm lên study_plans với status = 'pending_acceptance'
+    // TUYỆT ĐỐI KHÔNG tự cộng tín chỉ hay ghi thẳng vào completed_courses khi chưa có Cố vấn duyệt trên Web!
+    final firestore = _firestore;
+    if (firestore != null) {
+      try {
+        final planRef = firestore.collection('study_plans').doc(plan.id);
+        final updatedPlan = plan.copyWith(
+          studentName: profile.fullName,
+          studentCode: profile.studentId,
+          status: 'pending_acceptance',
+          isCompleted: false,
+          isSaved: true,
+          submittedGrades: submittedGrades,
+          updatedAt: DateTime.now(),
+        );
+        await planRef.set({
+          ...updatedPlan.toMap(),
+          'status': 'pending_acceptance',
+          'isCompleted': false,
+          'submittedGrades': submittedGrades,
+          'reviewReason': null,
+          'updatedAt': DateTime.now().toIso8601String(),
+        }, SetOptions(merge: true));
+
+        AppLogger.info(
+          'Đã gửi bảng điểm nghiệm thu kỳ học ${plan.id} (status=pending_acceptance) chờ Cố vấn duyệt trên Web!',
+        );
+      } catch (e, st) {
+        AppLogger.error('Chi tiết lỗi khi gửi nghiệm thu kỳ học lên Firestore', e, st);
+        rethrow;
+      }
+      return targetSemester;
+    }
+
+    // Chế độ Offline / Unit Test (_firestore == null): Cập nhật local phục vụ kiểm thử
+    final updatedCompletedMap = <String, CompletedCourseModel>{
+      for (final c in existingCompleted)
+        '${c.semesterIndex ?? 0}_${c.code}': c,
+    };
+    final newPassedCodes = Set<String>.from(profile.passedCourseCodes);
+
+    for (final g in submittedGrades) {
+      final code = g['code'] as String;
+      final isActuallyPassed = g['isPassed'] as bool;
+      final docKey = '${targetSemester}_$code';
       updatedCompletedMap[docKey] = CompletedCourseModel(
-        code: course.code,
-        name: course.name,
-        credits: course.credits,
+        code: code,
+        name: g['name'] as String,
+        credits: g['credits'] as int,
         semesterIndex: targetSemester,
         semesterName: plan.semesterName,
-        grade: grade,
-        gradeLetter: gradeLetter,
+        grade: g['grade'] as double,
+        gradeLetter: g['gradeLetter'] as String,
         isPassed: isActuallyPassed,
       );
-
       if (isActuallyPassed) {
-        newPassedCodes.add(course.code);
-        if (!isAlreadyPassed) {
-          addedCredits += course.credits;
-        }
+        newPassedCodes.add(code);
       }
     }
 
@@ -702,68 +851,12 @@ class StudentService {
     final updatedGpa = GpaCalculator.calculateGpa(allCompletedList);
 
     final latestProfile = _localProfiles[uid] ?? profile;
-    final updatedProfile = latestProfile.copyWith(
+    _localProfiles[uid] = latestProfile.copyWith(
       accumulatedCredits: allCredits,
       passedCourseCodes: uniquePassed.keys.toList(),
       currentGpa: updatedGpa,
       isNewStudent: false,
     );
-    _localProfiles[uid] = updatedProfile;
-
-    // Đồng bộ lên Cloud Firestore nếu khả dụng
-    final firestore = _firestore;
-    final ref = _studentsRef;
-    if (firestore != null && ref != null) {
-      try {
-        final batch = firestore.batch();
-        for (final course in plan.selectedCourses) {
-          final docKey = '${targetSemester}_${course.code}';
-          final completedItem = updatedCompletedMap[docKey]!;
-          final completedRef = ref
-              .doc(uid)
-              .collection('completed_courses')
-              .doc(docKey);
-
-          batch.set(completedRef, {
-            'courseId': course.id,
-            'code': course.code,
-            'name': course.name,
-            'credits': course.credits,
-            'grade': completedItem.grade,
-            'gradeLetter': completedItem.gradeLetter,
-            'isPassed': completedItem.isActuallyPassed,
-            'semesterIndex': targetSemester,
-            'semesterName': plan.semesterName,
-            'completedAt': FieldValue.serverTimestamp(),
-          });
-        }
-
-        batch.set(ref.doc(uid), {
-          'accumulatedCredits': updatedProfile.accumulatedCredits,
-          'passedCourseCodes': updatedProfile.passedCourseCodes,
-          'currentGpa': updatedProfile.currentGpa,
-          'isNewStudent': false,
-        }, SetOptions(merge: true));
-
-        final planRef = firestore.collection('study_plans').doc(plan.id);
-        batch.set(planRef, {
-          ...plan.toMap(),
-          'isCompleted': true,
-          'status': 'completed',
-          'completedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        await batch.commit();
-        AppLogger.info(
-          'Đã nghiệm thu kỳ học ${plan.id} vào Kỳ $targetSemester cho $uid (+$addedCredits TC, GPA=$updatedGpa)',
-        );
-      } catch (e, st) {
-        AppLogger.warning(
-          'Đã lưu hoàn thành kỳ học ở local, lỗi đồng bộ Firestore: $e',
-        );
-        AppLogger.error('Chi tiết lỗi completeSemesterFromPlan', e, st);
-      }
-    }
 
     return targetSemester;
   }

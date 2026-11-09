@@ -6,6 +6,7 @@ import 'plan_service.dart';
 import 'storage_service.dart';
 import 'analytics_service.dart';
 import 'pdf_report_service.dart';
+import 'ai_advisor_service.dart';
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();
@@ -33,4 +34,8 @@ final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
 
 final pdfReportServiceProvider = Provider<PdfReportService>((ref) {
   return PdfReportService();
+});
+
+final aiAdvisorServiceProvider = Provider<AiAdvisorService>((ref) {
+  return AiAdvisorService();
 });

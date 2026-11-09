@@ -213,8 +213,82 @@ class SelectedCoursesScreen extends ConsumerWidget {
           AppSpacing.bottomClearanceDockedBtn,
         ),
         children: [
+          if ((state.plan.isRejected || state.plan.isAcceptanceRejected) &&
+              state.plan.reviewReason != null &&
+              state.plan.reviewReason!.trim().isNotEmpty) ...[
+            AppAlertBanner(
+              variant: AlertBannerVariant.danger,
+              message:
+                  '❌ Yêu cầu chỉnh sửa từ Cố vấn: ${state.plan.reviewReason}',
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           // Thẻ Tổng quan (Overview Card)
           _SelectedOverviewCard(state: state),
+
+          if (hasConflict) ...[
+            const SizedBox(height: AppSpacing.md),
+            InkWell(
+              borderRadius: BorderRadius.circular(AppRadius.card),
+              onTap: () => AiAdvisorModalSheet.show(context),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEFF6FF), Color(0xFFF5F3FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadius.card),
+                  border: Border.all(color: const Color(0xFFC7D2FE)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome,
+                        color: Color(0xFF4F46E5),
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            '✨ Nhờ Cố vấn AI gợi ý hoán đổi môn',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              color: Color(0xFF1E1B4B),
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Gemini & DeepSeek tự động tìm môn thay thế để hạ tải an toàn.',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
+                      color: Color(0xFF4F46E5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.xl),
 
           // Tiêu đề danh sách
