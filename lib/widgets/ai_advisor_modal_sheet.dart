@@ -83,18 +83,29 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
       allCourses = DatabaseSeeder.sampleCourses;
     }
 
-    CourseModel? replacementCourse;
-    if (advice.suggestedCourseCode != null) {
-      replacementCourse = allCourses.cast<CourseModel?>().firstWhere(
-            (c) => c?.code == advice.suggestedCourseCode,
-            orElse: () => null,
-          );
-    }
+    final planNotifier = ref.read(planAnalyzerViewModelProvider.notifier);
 
-    ref.read(planAnalyzerViewModelProvider.notifier).replaceConflictCourse(
-          replacement: replacementCourse,
-          targetCodeToReplace: advice.targetCourseCode,
-        );
+    String actionMsg = 'Lộ trình đã cân bằng';
+    if (advice.isReduceHours && advice.adjustedHours.isNotEmpty) {
+      planNotifier.updateMultipleCourseHours(advice.adjustedHours);
+      actionMsg = 'Đã tự động điều chỉnh giảm giờ tự học';
+    } else if (advice.isDrop && advice.targetCourseCode != null) {
+      planNotifier.removeCourseByCode(advice.targetCourseCode!);
+      actionMsg = 'Đã bớt môn ${advice.targetCourseCode} khỏi kỳ này';
+    } else if (advice.isReplace) {
+      CourseModel? replacementCourse;
+      if (advice.suggestedCourseCode != null) {
+        replacementCourse = allCourses.cast<CourseModel?>().firstWhere(
+              (c) => c?.code == advice.suggestedCourseCode,
+              orElse: () => null,
+            );
+      }
+      planNotifier.replaceConflictCourse(
+        replacement: replacementCourse,
+        targetCodeToReplace: advice.targetCourseCode,
+      );
+      actionMsg = 'Đã hoán đổi sang môn ${advice.suggestedCourseCode ?? 'thay thế'}';
+    }
 
     Navigator.of(context).pop();
 
@@ -102,7 +113,7 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
       SnackBar(
         content: Text(
           '🎉 Đã áp dụng gợi ý của ${advice.providerDisplayName}! '
-          'Lộ trình đã cân bằng (${advice.estimatedHoursAfter.toInt()}h/tuần).',
+          '$actionMsg (${advice.estimatedHoursAfter.toInt()}h/tuần).',
         ),
         backgroundColor: AppColors.successBorder,
         duration: const Duration(seconds: 3),
@@ -305,13 +316,29 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.lightbulb_outline_rounded, color: Color(0xFF16A34A), size: 18),
-                  SizedBox(width: 6),
+                  Icon(
+                    advice.isReduceHours
+                        ? Icons.tune_rounded
+                        : (advice.isDrop
+                            ? Icons.remove_circle_outline
+                            : (advice.isReplace
+                                ? Icons.swap_horiz_rounded
+                                : Icons.lightbulb_outline_rounded)),
+                    color: const Color(0xFF16A34A),
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    'Đề xuất chiến lược cân bằng:',
-                    style: TextStyle(
+                    advice.isReduceHours
+                        ? 'Đề xuất: Giảm thời gian tự học môn học'
+                        : (advice.isDrop
+                            ? 'Đề xuất: Bớt môn học để giảm tải'
+                            : (advice.isReplace
+                                ? 'Đề xuất: Hoán đổi sang môn học cân bằng'
+                                : 'Đề xuất chiến lược cân bằng:')),
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                       color: Color(0xFF15803D),
@@ -320,7 +347,73 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
                 ],
               ),
               const SizedBox(height: 8),
-              if (advice.targetCourseCode != null && advice.suggestedCourseCode != null)
+              if (advice.isReduceHours && advice.hoursReductions.isNotEmpty) ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: advice.hoursReductions.map((r) {
+                    final code = r['code'] as String? ?? '';
+                    final oldH = (r['oldHours'] as num?)?.toDouble() ?? 0.0;
+                    final newH = (r['newHours'] as num?)?.toDouble() ?? 0.0;
+                    final saved = (r['saved'] as num?)?.toDouble() ?? (oldH - newH);
+
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            code,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: AppColors.primaryBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${oldH.toStringAsFixed(oldH.truncateToDouble() == oldH ? 0 : 1)}h',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.dangerText,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Icon(Icons.arrow_forward_rounded, size: 12, color: Color(0xFF16A34A)),
+                          ),
+                          Text(
+                            '${newH.toStringAsFixed(newH.truncateToDouble() == newH ? 0 : 1)}h/tuần',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Color(0xFF15803D),
+                            ),
+                          ),
+                          if (saved > 0) ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              '(-${saved.toStringAsFixed(saved.truncateToDouble() == saved ? 0 : 1)}h)',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF16A34A),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 8),
+              ] else if (advice.isReplace && advice.targetCourseCode != null && advice.suggestedCourseCode != null) ...[
                 Row(
                   children: [
                     Container(
@@ -361,9 +454,35 @@ class _AiAdvisorModalSheetState extends ConsumerState<AiAdvisorModalSheet> {
                     ),
                   ],
                 ),
-              const SizedBox(height: 6),
+                const SizedBox(height: 8),
+              ] else if (advice.isDrop && advice.targetCourseCode != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerSurface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.dangerBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.remove_circle_outline, size: 16, color: AppColors.dangerText),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Bớt môn ${advice.targetCourseCode} (Dời sang kỳ sau)',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppColors.dangerText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
               Text(
-                '• Khối lượng sau khi đổi: ${advice.estimatedHoursAfter.toInt()}h tự học/tuần (Cân bằng ✅)',
+                '• Khối lượng sau khi điều chỉnh: ${advice.estimatedHoursAfter.toInt()}h tự học/tuần (Cân bằng ✅)',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 12,

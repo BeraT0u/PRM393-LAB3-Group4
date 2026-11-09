@@ -454,8 +454,13 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
 
   /// Xóa một môn học khỏi kế hoạch nháp ở local
   void removeCourse(CourseModel course) {
+    removeCourseByCode(course.code);
+  }
+
+  /// Bớt một môn học theo mã môn (phục vụ gợi ý bớt môn khi cực kỳ quá tải)
+  void removeCourseByCode(String courseCode) {
     final updatedCourses =
-        state.plan.selectedCourses.where((c) => c.code != course.code).toList();
+        state.plan.selectedCourses.where((c) => c.code != courseCode).toList();
     final updatedPlan = state.plan.copyWith(
       selectedCourses: updatedCourses,
       tuitionFee: _calculateTuition(updatedCourses),
@@ -464,7 +469,51 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
       updatedAt: DateTime.now(),
     );
     _planService.saveLocalDraftPlan(updatedPlan);
-    state = state.copyWith(plan: updatedPlan, errorMessage: null);
+    state = state.copyWith(
+      plan: updatedPlan,
+      hasReplacedConflict: true,
+      errorMessage: null,
+    );
+
+    _analyticsService.logResolvePlanConflict(
+      oldCourseId: courseCode,
+      newCourseId: 'DROPPED_COURSE',
+      newTotalHours: updatedPlan.totalSelfStudyHours.toInt(),
+    );
+  }
+
+  /// Cập nhật giờ tự học của nhiều môn học theo gợi ý của AI (Ưu tiên giảm giờ học đưa về <= 25h)
+  void updateMultipleCourseHours(Map<String, double> hoursPerCourse) {
+    if (hoursPerCourse.isEmpty) return;
+
+    final updatedCourses = state.plan.selectedCourses.map((c) {
+      if (hoursPerCourse.containsKey(c.code)) {
+        final newHours = hoursPerCourse[c.code]!;
+        return c.copyWith(plannedSelfStudyHours: newHours);
+      }
+      return c;
+    }).toList();
+
+    final updatedPlan = state.plan.copyWith(
+      selectedCourses: updatedCourses,
+      isSaved: false,
+      status: 'draft',
+      updatedAt: DateTime.now(),
+    );
+
+    _planService.saveLocalDraftPlan(updatedPlan);
+
+    state = state.copyWith(
+      plan: updatedPlan,
+      hasReplacedConflict: true,
+      errorMessage: null,
+    );
+
+    _analyticsService.logResolvePlanConflict(
+      oldCourseId: hoursPerCourse.keys.join(','),
+      newCourseId: 'REDUCED_HOURS',
+      newTotalHours: updatedPlan.totalSelfStudyHours.toInt(),
+    );
   }
 
   /// Xóa toàn bộ môn trong kế hoạch để chọn lại từ đầu (0 môn)

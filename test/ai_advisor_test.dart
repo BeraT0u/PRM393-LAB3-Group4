@@ -35,6 +35,19 @@ class MockAiAdvisorService extends AiAdvisorService {
   }
 }
 
+class ReduceHoursMockAiAdvisorService extends AiAdvisorService {
+  final AiPlanAdviceModel advice;
+  ReduceHoursMockAiAdvisorService(this.advice);
+
+  @override
+  Future<AiPlanAdviceModel> analyzePlanAndAdvise({
+    required PlanAnalyzerState state,
+    required List<CourseModel> allCourses,
+  }) async {
+    return advice;
+  }
+}
+
 void main() {
   late PlanService planService;
   late MockAiAdvisorService mockAiService;
@@ -122,6 +135,61 @@ void main() {
         find.text('• Sắp xếp 2h ôn bài xen kẽ các ngày trong tuần.'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('AiAdvisorModalSheet áp dụng gợi ý giảm giờ tự học (reduce_hours) và cập nhật tổng giờ an toàn',
+        (tester) async {
+      planService.saveLocalDraftPlan(
+        DatabaseSeeder.getInitialConflictPlan(
+          DatabaseSeeder.defaultStudent.uid,
+        ),
+      );
+
+      final reduceAdvice = const AiPlanAdviceModel(
+        provider: 'gemini',
+        riskLevel: 'high',
+        analysis: 'Kế hoạch học tập 27.5h/tuần vượt nhẹ ngưỡng an toàn 25h/tuần.',
+        recommendedAction: 'reduce_hours',
+        estimatedHoursAfter: 23.5,
+        adjustedHours: {'PRM393': 6.0, 'SWE302': 5.5},
+        hoursReductions: [
+          {'code': 'PRM393', 'oldHours': 8.0, 'newHours': 6.0, 'saved': 2.0},
+          {'code': 'SWE302', 'oldHours': 7.0, 'newHours': 5.5, 'saved': 1.5},
+        ],
+        reason: 'Giảm giờ tự học các môn nặng đưa về 23.5h/tuần an toàn.',
+      );
+
+      final customMockService = ReduceHoursMockAiAdvisorService(reduceAdvice);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            planServiceProvider.overrideWithValue(planService),
+            aiAdvisorServiceProvider.overrideWithValue(customMockService),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.warmPaperTheme,
+            home: const PlanAnalyzerScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Mở modal sheet với lời khuyên giảm giờ
+      await tester.tap(find.text('Tư vấn ngay'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Đề xuất: Giảm thời gian tự học môn học'), findsOneWidget);
+      expect(find.text('PRM393'), findsOneWidget);
+      expect(find.text('6h/tuần'), findsWidgets);
+      expect(find.text('Áp Dụng Gợi Ý Này'), findsOneWidget);
+
+      // Bấm nút áp dụng giảm giờ
+      await tester.tap(find.text('Áp Dụng Gợi Ý Này'));
+      await tester.pumpAndSettle();
+
+      // Modal sheet đóng lại
+      expect(find.byType(AiAdvisorModalSheet), findsNothing);
     });
   });
 }
