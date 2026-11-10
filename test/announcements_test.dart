@@ -244,5 +244,47 @@ void main() {
       // Chuông không còn Badge đỏ
       expect(find.byType(Badge), findsNothing);
     });
+
+    testWidgets(
+        'ProfileScreen renders Firebase Cloud Showcase and Crashlytics test dialog',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            announcementsStreamProvider.overrideWithValue(
+              const AsyncValue.data([]),
+            ),
+          ],
+          child: const MaterialApp(
+            home: ProfileScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Cuộn xuống tìm khung Firebase Cloud Showcase & nút Test Crashlytics
+      final testCrashBtn = find.byKey(const Key('test_crashlytics_btn'));
+      await tester.ensureVisible(testCrashBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('☁️ Firebase Cloud Showcase'), findsOneWidget);
+      expect(testCrashBtn, findsOneWidget);
+      expect(find.byKey(const Key('fcm_remote_config_btn')), findsOneWidget);
+
+      // Bấm nút Test Crashlytics -> hiện Dialog chọn Non-Fatal hoặc Force Crash
+      await tester.tap(testCrashBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Kiểm thử Firebase Crashlytics'), findsOneWidget);
+      expect(find.byKey(const Key('crashlytics_non_fatal_btn')), findsOneWidget);
+      expect(find.byKey(const Key('crashlytics_fatal_btn')), findsOneWidget);
+
+      // Bấm Gửi Non-Fatal -> đóng dialog và hiện SnackBar hướng dẫn Cold Stop
+      await tester.tap(find.byKey(const Key('crashlytics_non_fatal_btn')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+    });
   });
 }

@@ -1,6 +1,10 @@
 
 
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -233,6 +237,201 @@ class ProfileScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  /// UC-34: Mở hộp thoại kiểm thử Firebase Crashlytics (Non-Fatal & Force Fatal Crash)
+  Future<void> _handleTestCrashlytics(BuildContext context, String uid) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppColors.surfaceCard,
+        title: const Text(
+          'Kiểm thử Firebase Crashlytics',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          '• Non-Fatal: Lưu lỗi vào hàng đợi cục bộ và chỉ gửi lên server khi tắt hẳn app mở lại (Cold Restart), cộng thêm độ trễ xử lý từ Console.\n\n'
+          '• Force Fatal Crash: Đóng app tức thì để khi bạn mở lại app ngay sau đó, SDK ưu tiên đẩy báo cáo lên Firebase nhanh nhất.',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('Hủy'),
+          ),
+          OutlinedButton(
+            key: const Key('crashlytics_non_fatal_btn'),
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _recordNonFatalCrash(context, uid);
+            },
+            child: const Text('Gửi Non-Fatal'),
+          ),
+          ElevatedButton(
+            key: const Key('crashlytics_fatal_btn'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.dangerBorder,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.of(dialogCtx).pop();
+              _triggerFatalCrash(context, uid);
+            },
+            child: const Text('Force Crash'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _recordNonFatalCrash(BuildContext context, String uid) async {
+    try {
+      if (!kIsWeb && Firebase.apps.isNotEmpty) {
+        final crashlytics = FirebaseCrashlytics.instance;
+        await crashlytics.setCrashlyticsCollectionEnabled(true);
+        await crashlytics.setUserIdentifier(uid);
+        await crashlytics.setCustomKey('source_screen', 'SCR-08_Profile');
+        await crashlytics.log('Manual Non-Fatal Error triggered by $uid');
+        await crashlytics.recordError(
+          StateError('EduPlan Non-Fatal Test Error from SCR-08'),
+          StackTrace.current,
+          reason: 'UC-34 Manual Crashlytics Verification',
+          fatal: false,
+        );
+      }
+    } catch (_) {
+      // Fallback an toàn khi chạy môi trường test/offline
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          '⚡ Đã ghi Non-Fatal Error! Hãy tắt hẳn app (Cold Stop) rồi mở lại để SDK đẩy báo cáo lên Firebase Console.',
+        ),
+        backgroundColor: AppColors.primaryBlue,
+        duration: Duration(seconds: 5),
+      ),
+    );
+  }
+
+  Future<void> _triggerFatalCrash(BuildContext context, String uid) async {
+    try {
+      if (!kIsWeb && Firebase.apps.isNotEmpty) {
+        final crashlytics = FirebaseCrashlytics.instance;
+        await crashlytics.setCrashlyticsCollectionEnabled(true);
+        await crashlytics.setUserIdentifier(uid);
+        await crashlytics.setCustomKey('demo_crash', 'manual_fatal_trigger');
+        await crashlytics.log('Manual Fatal Crash triggered from SCR-08');
+        crashlytics.crash();
+        return;
+      }
+    } catch (_) {
+      // Fallback an toàn khi chạy môi trường test/offline
+    }
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('💥 Mô phỏng Force Fatal Crash (chế độ test/offline).'),
+        backgroundColor: AppColors.dangerBorder,
+      ),
+    );
+  }
+
+  /// UC-34: Hộp thư FCM Notification & Đồng bộ Remote Config
+  Future<void> _showFcmInboxAndSyncRemoteConfig(
+    BuildContext context,
+    PlanAnalyzerState planState,
+  ) async {
+    bool studyTipsEnabled = true;
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        await FirebaseRemoteConfig.instance.fetchAndActivate();
+        studyTipsEnabled =
+            FirebaseRemoteConfig.instance.getBool('enable_study_tips');
+      }
+    } catch (_) {}
+
+    if (!context.mounted) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppRadius.card)),
+      ),
+      builder: (sheetCtx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.notifications_active_outlined,
+                    color: AppColors.primaryBlue,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      'Hộp thư FCM & Remote Config',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryBlueTonal,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '🔧 Remote Config hiện tại:\n'
+                  '• max_safe_workload_hours = ${planState.maxSafeThresholdHours.toInt()}h/tuần\n'
+                  '• enable_study_tips = $studyTipsEnabled',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.primaryBlue,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const Text(
+                '📩 Thông báo đẩy (FCM Inbox gần đây):',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              const Text(
+                '• [PRM393] Nhắc hạn nộp Lab 3 Cloud-Enabled Mobile App vào Chủ nhật tuần này.\n'
+                '• [Workload Advisor] Hãy giữ tổng giờ tự học <= 25h/tuần để đảm bảo mục tiêu GPA.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(sheetCtx).pop(),
+                  child: const Text('Đóng'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1236,6 +1435,111 @@ class ProfileScreen extends ConsumerWidget {
                     vm.updateSettings(autoWarnWorkload: val);
                   },
                 ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // UC-34: Firebase Demo Showcase (Crashlytics, Remote Config & FCM Inbox)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceCard,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                border: Border.all(color: AppColors.borderStructural),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '☁️ Firebase Cloud Showcase',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      StatusBadge(
+                        label:
+                            'Ngưỡng RC: ${planState.maxSafeThresholdHours.toInt()}h',
+                        type: StatusBadgeType.success,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  const Text(
+                    'Kiểm tra nhanh Crashlytics (Non-Fatal / Force Crash), Remote Config và FCM Notification Inbox.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('test_crashlytics_btn'),
+                          onPressed: () => _handleTestCrashlytics(context, uid),
+                          icon: const Icon(
+                            Icons.bug_report_outlined,
+                            size: 16,
+                            color: AppColors.warningText,
+                          ),
+                          label: const Text(
+                            'Test Crashlytics',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.warningText,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: AppColors.warningSurface,
+                            side: const BorderSide(
+                              color: AppColors.warningBorder,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          key: const Key('fcm_remote_config_btn'),
+                          onPressed: () => _showFcmInboxAndSyncRemoteConfig(
+                            context,
+                            planState,
+                          ),
+                          icon: const Icon(
+                            Icons.notifications_none_rounded,
+                            size: 16,
+                            color: AppColors.primaryBlue,
+                          ),
+                          label: const Text(
+                            'FCM & Remote Config',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryBlue,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: AppColors.borderStructural,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.lg),

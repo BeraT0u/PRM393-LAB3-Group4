@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
 import 'firebase_options.dart';
@@ -17,6 +18,9 @@ class FirebaseService {
       isFirebaseInitialized = true;
       AppLogger.info('Firebase đã được khởi tạo thành công.');
 
+      // Khởi tạo Crashlytics thu thập tự động lỗi Flutter & Async
+      await _initializeCrashlytics();
+
       // Cấu hình Remote Config mặc định
       await _initializeRemoteConfig();
 
@@ -28,6 +32,24 @@ class FirebaseService {
       if (kDebugMode) {
         debugPrint(stack.toString());
       }
+    }
+  }
+
+  static Future<void> _initializeCrashlytics() async {
+    if (kIsWeb) return;
+    try {
+      await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+      FlutterError.onError = (errorDetails) {
+        FlutterError.presentError(errorDetails);
+        FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+      };
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+      AppLogger.info('Crashlytics đã kích hoạt thu thập tự động.');
+    } catch (e) {
+      AppLogger.warning('Không thể khởi tạo Crashlytics: $e');
     }
   }
 
