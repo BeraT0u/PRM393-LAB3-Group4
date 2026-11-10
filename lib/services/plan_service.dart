@@ -238,4 +238,43 @@ class PlanService {
       rethrow;
     }
   }
+
+  /// Lắng nghe ngưỡng giờ tự học an toàn (Max Safe Workload Hours) từ Firestore thời gian thực
+  Stream<double> watchWorkloadThreshold() {
+    if (Firebase.apps.isEmpty) {
+      return const Stream.empty();
+    }
+    try {
+      return FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('workload_config')
+          .snapshots()
+          .map((snap) {
+        if (snap.exists && snap.data() != null) {
+          final val =
+              (snap.data()!['maxSafeWorkloadHours'] as num?)?.toDouble();
+          if (val != null && val > 0) return val;
+        }
+        return 25.0;
+      });
+    } catch (_) {
+      return const Stream.empty();
+    }
+  }
+
+  /// Đọc ngưỡng giờ tự học an toàn từ Firestore
+  Future<double?> getWorkloadThreshold() async {
+    if (Firebase.apps.isEmpty) return null;
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('system_settings')
+          .doc('workload_config')
+          .get();
+      if (snap.exists && snap.data() != null) {
+        final val = (snap.data()!['maxSafeWorkloadHours'] as num?)?.toDouble();
+        if (val != null && val > 0) return val;
+      }
+    } catch (_) {}
+    return null;
+  }
 }

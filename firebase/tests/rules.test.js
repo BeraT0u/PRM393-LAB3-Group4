@@ -6,6 +6,10 @@ const {
 const fs = require('fs');
 const path = require('path');
 
+if (!process.env.FIRESTORE_EMULATOR_HOST) {
+  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+}
+
 const PROJECT_ID = 'prm393-final-test';
 
 describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
@@ -15,6 +19,7 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
   let staffDb;
   let adminDb;
   let otherUserDb;
+  let unauthedDb;
 
   before(async () => {
     const rulesPath = path.resolve(__dirname, '../firestore.rules');
@@ -35,6 +40,7 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
     staffDb = testEnv.authenticatedContext('staff_1').firestore();
     adminDb = testEnv.authenticatedContext('admin_1').firestore();
     otherUserDb = testEnv.authenticatedContext('user_456').firestore();
+    unauthedDb = testEnv.unauthenticatedContext().firestore();
   });
 
   after(async () => {
@@ -438,5 +444,164 @@ describe('Cloud Firestore Security Rules (Appendix B Verification)', () => {
         totalCredits: 15,
       })
     );
+  });
+
+  // System Settings Tests (match /system_settings/{id})
+  describe('System Settings (system_settings/{id})', () => {
+    it('allows authenticated student to read system_settings/workload_config', async () => {
+      await systemDb.collection('users').doc('user_123').set({
+        uid: 'user_123',
+        role: 'user',
+      });
+      await systemDb.collection('system_settings').doc('workload_config').set({
+        maxSafeWorkloadHours: 25,
+        updatedBy: 'staff_1',
+      });
+
+      await assertSucceeds(
+        userDb.collection('system_settings').doc('workload_config').get()
+      );
+    });
+
+    it('denies unauthenticated user from reading system_settings/workload_config', async () => {
+      await systemDb.collection('system_settings').doc('workload_config').set({
+        maxSafeWorkloadHours: 25,
+      });
+
+      await assertFails(
+        unauthedDb.collection('system_settings').doc('workload_config').get()
+      );
+    });
+
+    it('allows staff or admin to create and update system_settings/workload_config with valid hours', async () => {
+      await systemDb.collection('users').doc('staff_1').set({
+        uid: 'staff_1',
+        role: 'staff',
+      });
+      await systemDb.collection('users').doc('admin_1').set({
+        uid: 'admin_1',
+        role: 'admin',
+      });
+
+      // Staff creates workload_config with valid hours
+      await assertSucceeds(
+        staffDb.collection('system_settings').doc('workload_config').set({
+          maxSafeWorkloadHours: 30,
+          updatedBy: 'staff_1',
+          updatedAt: new Date(),
+        })
+      );
+
+      // Admin updates workload_config with valid hours
+      await assertSucceeds(
+        adminDb.collection('system_settings').doc('workload_config').update({
+          maxSafeWorkloadHours: 40,
+          updatedBy: 'admin_1',
+          updatedAt: new Date(),
+        })
+      );
+    });
+
+    it('denies regular student from creating or updating system_settings/workload_config', async () => {
+      await systemDb.collection('users').doc('user_123').set({
+        uid: 'user_123',
+        role: 'user',
+      });
+      await systemDb.collection('system_settings').doc('workload_config').set({
+        maxSafeWorkloadHours: 25,
+      });
+
+      // Student cannot update
+      await assertFails(
+        userDb.collection('system_settings').doc('workload_config').update({
+          maxSafeWorkloadHours: 35,
+        })
+      );
+
+      // Student cannot set/create
+      await assertFails(
+        userDb.collection('system_settings').doc('workload_config').set({
+          maxSafeWorkloadHours: 35,
+        })
+      );
+    });
+
+    it('rejects invalid maxSafeWorkloadHours (negative, < 10, > 60, or non-numeric)', async () => {
+      await systemDb.collection('users').doc('staff_1').set({
+        uid: 'staff_1',
+        role: 'staff',
+      });
+      await systemDb.collection('system_settings').doc('workload_config').set({
+        maxSafeWorkloadHours: 25,
+      });
+
+      // Negative hours
+      await assertFails(
+        staffDb.collection('system_settings').doc('workload_config').update({
+          maxSafeWorkloadHours: -5,
+        })
+      );
+
+      // Hours < 10
+      await assertFails(
+        staffDb.collection('system_settings').doc('workload_config').update({
+          maxSafeWorkloadHours: 9,
+        })
+      );
+
+      // Hours > 60
+      await assertFails(
+        staffDb.collection('system_settings').doc('workload_config').update({
+          maxSafeWorkloadHours: 65,
+        })
+      );
+
+      // Non-numeric hours
+      await assertFails(
+        staffDb.collection('system_settings').doc('workload_config').update({
+          maxSafeWorkloadHours: 'invalid',
+        })
+      );
+
+      // updatedBy > 100 chars
+      await assertFails(
+        staffDb.collection('system_settings').doc('workload_config').update({
+          updatedBy: 'a'.repeat(101),
+        })
+      );
+    });
+
+    it('disallows deletion of system_settings documents by any role', async () => {
+      await systemDb.collection('users').doc('admin_1').set({
+        uid: 'admin_1',
+        role: 'admin',
+      });
+      await systemDb.collection('users').doc('staff_1').set({
+        uid: 'staff_1',
+        role: 'staff',
+      });
+      await systemDb.collection('users').doc('user_123').set({
+        uid: 'user_123',
+        role: 'user',
+      });
+      await systemDb.collection('system_settings').doc('workload_config').set({
+        maxSafeWorkloadHours: 25,
+      });
+
+      // Admin cannot delete
+      await assertFails(
+        adminDb.collection('system_settings').doc('workload_config').delete()
+      );
+
+      // Staff cannot delete
+      await assertFails(
+        staffDb.collection('system_settings').doc('workload_config').delete()
+      );
+
+      // Student cannot delete
+      await assertFails(
+        userDb.collection('system_settings').doc('workload_config').delete()
+      );
+    });
   });
 });

@@ -197,6 +197,16 @@ class PlanAnalyzerViewModel extends Notifier<PlanAnalyzerState> {
     });
     ref.onDispose(sub.cancel);
 
+    final workloadSub = _planService.watchWorkloadThreshold().listen((newThreshold) {
+      if (newThreshold > 0 && newThreshold != state.maxSafeThresholdHours) {
+        state = state.copyWith(
+          maxSafeThresholdHours: newThreshold,
+          plan: state.plan.copyWith(maxSafeThresholdHours: newThreshold),
+        );
+      }
+    });
+    ref.onDispose(workloadSub.cancel);
+
     return initialState;
   }
 

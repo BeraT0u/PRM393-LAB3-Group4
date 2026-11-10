@@ -92,6 +92,12 @@ rules_version = '2';
 //   - status: string (required, 'published' | 'archived')
 //   - createdAt: timestamp (optional) - Creation timestamp
 //
+// Collection: system_settings/{id}
+// Fields:
+//   - maxSafeWorkloadHours: number (optional, 10 <= maxSafeWorkloadHours <= 60) - Max safe workload threshold hours
+//   - updatedBy: string (optional, size <= 100) - Identifier of user who updated setting
+//   - updatedAt: timestamp (optional) - Setting update timestamp
+//
 // ===============================================================
 
 service cloud.firestore {
@@ -119,6 +125,18 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && getUserRole() == 'admin';
+    }
+
+    function isValidSystemSetting() {
+      return (!('maxSafeWorkloadHours' in request.resource.data) ||
+              (request.resource.data.maxSafeWorkloadHours is number &&
+               request.resource.data.maxSafeWorkloadHours >= 10 &&
+               request.resource.data.maxSafeWorkloadHours <= 60)) &&
+             (!('updatedBy' in request.resource.data) ||
+              (request.resource.data.updatedBy is string &&
+               request.resource.data.updatedBy.size() <= 100)) &&
+             (!('updatedAt' in request.resource.data) ||
+              request.resource.data.updatedAt is timestamp);
     }
 
     // ===============================================================
@@ -236,6 +254,20 @@ service cloud.firestore {
 
       // Only Admin can hard delete announcements
       allow delete: if isAdmin();
+    }
+
+    // ===============================================================
+    // Collection: system_settings/{id}
+    // ===============================================================
+    match /system_settings/{id} {
+      // Authenticated users (students, staff, admin) can read system configurations
+      allow read: if isSignedIn();
+
+      // Only staff or admin can create or update system settings with data validation
+      allow create, update: if isStaffOrAdmin() && isValidSystemSetting();
+
+      // System settings cannot be deleted
+      allow delete: if false;
     }
 
     // ===============================================================
