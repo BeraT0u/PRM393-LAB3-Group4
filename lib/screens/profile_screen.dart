@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../models/announcement_model.dart';
+// announcement_service exported by service_providers
 import '../models/student_profile_model.dart';
 import '../services/database_seeder.dart';
 import '../services/service_providers.dart';
@@ -403,6 +404,7 @@ class ProfileScreen extends ConsumerWidget {
 
   /// Mở Modal Popup danh sách thông báo từ Ban Giảng Huấn & Web Admin
   void _showAnnouncementsPopup(BuildContext context, WidgetRef ref) {
+    final uid = ref.read(currentStudentUidProvider);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -421,6 +423,10 @@ class ProfileScreen extends ConsumerWidget {
               builder: (consumerCtx, watchRef, _) {
                 final announcementsAsync =
                     watchRef.watch(announcementsStreamProvider);
+                final readIds = watchRef.watch(readAnnouncementsProvider);
+                final items = announcementsAsync.value ?? [];
+                final unreadCount =
+                    items.where((a) => !readIds.contains(a.id)).length;
 
                 return Column(
                   children: [
@@ -458,8 +464,8 @@ class ProfileScreen extends ConsumerWidget {
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
+                              children: const [
+                                Text(
                                   'Hộp Thư Thông Báo',
                                   style: TextStyle(
                                     fontSize: 16,
@@ -467,8 +473,10 @@ class ProfileScreen extends ConsumerWidget {
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
+                                SizedBox(height: 2),
                                 Text(
                                   'Từ Ban Giảng Huấn & Cố Vấn Học Tập',
+                                  overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.textSecondary,
@@ -481,6 +489,78 @@ class ProfileScreen extends ConsumerWidget {
                             icon: const Icon(Icons.close_rounded, size: 20),
                             onPressed: () => Navigator.of(sheetCtx).pop(),
                           ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: AppColors.borderStructural),
+                    // Status & Quick Action Bar
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: AppSpacing.xs,
+                      ),
+                      color: AppColors.canvasBg,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: unreadCount > 0
+                                      ? AppColors.primaryBlue
+                                      : AppColors.textSecondary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                unreadCount > 0
+                                    ? '$unreadCount thông báo chưa đọc'
+                                    : 'Đã đọc toàn bộ thông báo',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: unreadCount > 0
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: unreadCount > 0
+                                      ? AppColors.primaryBlue
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (unreadCount > 0)
+                            TextButton.icon(
+                              key: const Key('mark_all_read_btn'),
+                              onPressed: () {
+                                final allIds = items.map((e) => e.id).toList();
+                                watchRef
+                                    .read(readAnnouncementsProvider.notifier)
+                                    .markAllAsRead(allIds, userId: uid);
+                              },
+                              icon: const Icon(
+                                Icons.done_all_rounded,
+                                size: 16,
+                                color: AppColors.primaryBlue,
+                              ),
+                              label: const Text(
+                                'Đã đọc tất cả',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -558,7 +638,14 @@ class ProfileScreen extends ConsumerWidget {
                                 const SizedBox(height: AppSpacing.md),
                             itemBuilder: (ctx, i) {
                               final ann = items[i];
-                              return _buildAnnouncementCard(ctx, ann);
+                              final isRead = readIds.contains(ann.id);
+                              return _buildAnnouncementCard(
+                                ctx,
+                                watchRef,
+                                ann,
+                                isRead,
+                                uid,
+                              );
                             },
                           );
                         },
@@ -574,27 +661,48 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildAnnouncementCard(BuildContext context, AnnouncementModel ann) {
+  Widget _buildAnnouncementCard(
+    BuildContext context,
+    WidgetRef ref,
+    AnnouncementModel ann,
+    bool isRead,
+    String uid,
+  ) {
     final catColor = _getCategoryColor(ann.category);
     final catBg = _getCategoryBgColor(ann.category);
     final dateStr = _formatAnnouncementDate(ann.createdAt);
 
     return InkWell(
       borderRadius: BorderRadius.circular(AppRadius.card),
-      onTap: () => _showAnnouncementDetailDialog(context, ann),
-      child: Container(
+      onTap: () {
+        if (!isRead) {
+          ref
+              .read(readAnnouncementsProvider.notifier)
+              .markAsRead(ann.id, userId: uid);
+        }
+        _showAnnouncementDetailDialog(context, ann);
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.all(AppSpacing.md),
         decoration: BoxDecoration(
-          color: AppColors.surfaceCard,
+          color: isRead ? AppColors.canvasBg : AppColors.surfaceCard,
           borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(color: AppColors.borderStructural),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(
+            color: isRead
+                ? AppColors.borderStructural
+                : AppColors.primaryBlue.withValues(alpha: 0.35),
+            width: isRead ? 1.0 : 1.2,
+          ),
+          boxShadow: isRead
+              ? null
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,7 +732,7 @@ class ProfileScreen extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.canvasBg,
+                    color: isRead ? AppColors.surfaceCard : AppColors.canvasBg,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(color: AppColors.borderStructural),
                   ),
@@ -637,6 +745,26 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 const Spacer(),
+                if (isRead)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.done_all_rounded,
+                        size: 13,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 3),
+                      Text(
+                        'Đã đọc',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                    ],
+                  ),
                 Text(
                   dateStr,
                   style: const TextStyle(
@@ -648,46 +776,115 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(height: AppSpacing.sm),
             // Title
-            Text(
-              ann.title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            // Author
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(
-                  Icons.person_outline_rounded,
-                  size: 13,
-                  color: AppColors.textSecondary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  ann.authorName,
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.textSecondary,
-                    fontStyle: FontStyle.italic,
+                if (!isRead) ...[
+                  Container(
+                    margin: const EdgeInsets.only(top: 5, right: 6),
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryBlue,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
+                Expanded(
+                  child: Text(
+                    ann.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isRead
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                      height: 1.3,
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.xs),
-            // Body preview
+            // Body Preview
             Text(
               ann.body,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
-                color: AppColors.textPrimary,
+                color: isRead
+                    ? AppColors.textSecondary.withValues(alpha: 0.85)
+                    : AppColors.textPrimary,
                 height: 1.4,
               ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            // Bottom row: Author and "Đã đọc" button
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.person_outline_rounded,
+                      size: 13,
+                      color: AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      ann.authorName,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+                if (!isRead)
+                  InkWell(
+                    key: Key('mark_read_${ann.id}'),
+                    onTap: () {
+                      ref
+                          .read(readAnnouncementsProvider.notifier)
+                          .markAsRead(ann.id, userId: uid);
+                    },
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryBlueTonal,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.primaryBlue.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.check_rounded,
+                            size: 13,
+                            color: AppColors.primaryBlue,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Đã đọc',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryBlue,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
@@ -854,6 +1051,10 @@ class ProfileScreen extends ConsumerWidget {
     final vm = ref.read(completedCoursesViewModelProvider.notifier);
     final planState = ref.watch(planAnalyzerViewModelProvider);
     final announcementsAsync = ref.watch(announcementsStreamProvider);
+    final readAnnouncementIds = ref.watch(readAnnouncementsProvider);
+    final allAnnouncements = announcementsAsync.value ?? [];
+    final unreadAnnouncementsCount =
+        allAnnouncements.where((a) => !readAnnouncementIds.contains(a.id)).length;
 
     return MainScaffold(
       currentTabIndex: 3,
@@ -864,10 +1065,10 @@ class ProfileScreen extends ConsumerWidget {
           IconButton(
             tooltip: 'Hộp thư thông báo',
             onPressed: () => _showAnnouncementsPopup(context, ref),
-            icon: (announcementsAsync.value != null && announcementsAsync.value!.isNotEmpty)
+            icon: unreadAnnouncementsCount > 0
                 ? Badge(
                     label: Text(
-                      '${announcementsAsync.value!.length}',
+                      '$unreadAnnouncementsCount',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,

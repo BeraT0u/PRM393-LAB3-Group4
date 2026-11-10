@@ -9,6 +9,7 @@ import 'pdf_report_service.dart';
 import 'ai_advisor_service.dart';
 import 'announcement_service.dart';
 import '../models/announcement_model.dart';
+export 'announcement_service.dart' show readAnnouncementsProvider, ReadAnnouncementsNotifier;
 
 final authServiceProvider = Provider<AuthService>((ref) {
   return AuthService();

@@ -1,3 +1,4 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -116,4 +117,87 @@ class AnnouncementService {
       return defaultAnnouncements;
     }
   }
+
+  static final Set<String> _cachedReadIds = {};
+
+  static Set<String> get cachedReadIds => Set.unmodifiable(_cachedReadIds);
+
+  /// Xóa cache (dùng khi đăng xuất hoặc trong test)
+  static void clearCache() {
+    _cachedReadIds.clear();
+  }
+
+  static void saveReadId(String id, {String? userId}) {
+    _cachedReadIds.add(id);
+    _syncToFirestore(userId);
+  }
+
+  static void saveAllReadIds(List<String> ids, {String? userId}) {
+    _cachedReadIds.addAll(ids);
+    _syncToFirestore(userId);
+  }
+
+  static void removeReadId(String id, {String? userId}) {
+    _cachedReadIds.remove(id);
+    _syncToFirestore(userId);
+  }
+
+  static Future<void> loadUserReadIds(String userId) async {
+    if (Firebase.apps.isEmpty) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('students')
+          .doc(userId)
+          .get();
+      if (doc.exists && doc.data() != null) {
+        final list = doc.data()!['readAnnouncementIds'];
+        if (list is List) {
+          _cachedReadIds.addAll(list.map((e) => e.toString()));
+        }
+      }
+    } catch (_) {}
+  }
+
+  static void _syncToFirestore(String? userId) {
+    if (userId == null || userId.isEmpty || Firebase.apps.isEmpty) return;
+    try {
+      FirebaseFirestore.instance.collection('students').doc(userId).set({
+        'readAnnouncementIds': _cachedReadIds.toList(),
+      }, SetOptions(merge: true)).ignore();
+    } catch (_) {}
+  }
 }
+
+/// Quản lý trạng thái danh sách ID thông báo đã đọc (Realtime Riverpod Notifier)
+class ReadAnnouncementsNotifier extends Notifier<Set<String>> {
+  @override
+  Set<String> build() {
+    return AnnouncementService.cachedReadIds;
+  }
+
+  void markAsRead(String id, {String? userId}) {
+    if (!state.contains(id)) {
+      state = {...state, id};
+      AnnouncementService.saveReadId(id, userId: userId);
+    }
+  }
+
+  void markAllAsRead(List<String> ids, {String? userId}) {
+    state = {...state, ...ids};
+    AnnouncementService.saveAllReadIds(ids, userId: userId);
+  }
+
+  void markAsUnread(String id, {String? userId}) {
+    if (state.contains(id)) {
+      state = state.where((item) => item != id).toSet();
+      AnnouncementService.removeReadId(id, userId: userId);
+    }
+  }
+
+  bool isRead(String id) => state.contains(id);
+}
+
+final readAnnouncementsProvider =
+    NotifierProvider<ReadAnnouncementsNotifier, Set<String>>(
+  ReadAnnouncementsNotifier.new,
+);
